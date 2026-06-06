@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, viewport-fit=cover"
+  />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <title>ПОНГ · 8БИТ</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="app">
+    <!-- Игровое поле -->
+    <canvas id="game"></canvas>
+
+    <!--
+      Тач-управление (DOM-оверлей поверх canvas).
+      Стрелки указывают вверх/вниз - направление движения ракетки.
+      Изначально скрыто - показывается только во время игры.
+    -->
+    <div class="controls" id="controls" style="display: none;">
+      <div class="controls-side controls-left" data-player="0">
+        <button class="ctrl-btn" type="button" data-player="0" data-dir="up" aria-label="Игрок 1: вверх">↑</button>
+        <button class="ctrl-btn" type="button" data-player="0" data-dir="down" aria-label="Игрок 1: вниз">↓</button>
+      </div>
+      <div class="controls-side controls-right" data-player="1">
+        <button class="ctrl-btn" type="button" data-player="1" data-dir="down" aria-label="Игрок 2: вверх">↑</button>
+        <button class="ctrl-btn" type="button" data-player="1" data-dir="up" aria-label="Игрок 2: вниз">↓</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>
