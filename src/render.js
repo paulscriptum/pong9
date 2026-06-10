@@ -34,6 +34,11 @@ const titleImg = new Image();
 titleImg.crossOrigin = "anonymous";
 titleImg.src = "/images/title_8bit_pong.png";
 
+
+const logoYandexAcademyImg = new Image();
+logoYandexAcademyImg.crossOrigin = "anonymous";
+logoYandexAcademyImg.src = "/images/logo_yandex_academy.png?v=1";
+
 const speechBubbleImg = new Image();
 speechBubbleImg.crossOrigin = "anonymous";
 speechBubbleImg.src = "/images/speech_bubble_play_8bit.png";
@@ -464,19 +469,28 @@ export class Renderer {
   drawLogo(min) {
     const ctx = this.ctx;
     const { field } = this.layout;
-    const lx = field.x - min * 0.06;
-    const ly = field.y * 0.5;
+    const lx = field.x;
+    const ly = field.y * 0.42;
 
     ctx.save();
-    ctx.font = `700 ${min * 0.032}px ${BRAND.fonts.brand}`;
-    ctx.textAlign = "left";
-    ctx.textBaseline = "middle";
-    ctx.fillStyle = BRAND.colors.text;
-    ctx.fillText("8БИТ", lx - min * 0.04, ly - min * 0.01);
 
-    ctx.font = `400 ${min * 0.011}px ${BRAND.fonts.ui}`;
-    ctx.fillText("Журнал", lx - min * 0.04, ly + min * 0.022);
-    ctx.fillText("Яндекс Образования", lx - min * 0.04, ly + min * 0.038);
+    if (logoYandexAcademyImg.complete && logoYandexAcademyImg.naturalWidth > 0) {
+      const imgH = min * 0.045;
+      const imgW =
+        (logoYandexAcademyImg.naturalWidth / logoYandexAcademyImg.naturalHeight) * imgH;
+      ctx.drawImage(logoYandexAcademyImg, lx, ly - imgH / 2, imgW, imgH);
+    } else {
+      ctx.font = `700 ${min * 0.032}px ${BRAND.fonts.brand}`;
+      ctx.textAlign = "left";
+      ctx.textBaseline = "middle";
+      ctx.fillStyle = BRAND.colors.text;
+      ctx.fillText("8БИТ", lx, ly - min * 0.01);
+
+      ctx.font = `400 ${min * 0.011}px ${BRAND.fonts.ui}`;
+      ctx.fillText("Журнал", lx, ly + min * 0.022);
+      ctx.fillText("Яндекс Образования", lx, ly + min * 0.038);
+    }
+
     ctx.restore();
   }
 
