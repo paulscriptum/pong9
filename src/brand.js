@@ -1,23 +1,24 @@
 // ===========================================================
 // Бренд-токены 8БИТ + игровой конфиг. Единый источник правды.
-// Дизайн из брендбука: светлый фон, фиолетовый акцент, черное поле.
+// Редизайн: чёрный фон, белое поле, монохромный UI.
 // ===========================================================
 
 export const BRAND = {
   colors: {
-    bg: "#E8E4E0", // светло-серый/бежевый фон
-    field: "#0c0c0c", // черное игровое поле
-    text: "#0c0c0c", // темный текст для UI
-    ink: "#ffffff", // белые элементы на поле
-    accent: "#6B5CE7", // фиолетовый акцент
-    accentDark: "#5A4BD6",
-    dim: "#999999",
-    line: "rgba(255,255,255,0.4)",
-    fieldBorder: "#6B5CE7", // фиолетовая рамка поля
+    bg: "#000000",
+    field: "#ffffff",
+    text: "#ffffff",
+    ink: "#0c0c0c",
+    accent: "#873CF5", // фиолетовый из макета (кнопки управления)
+    accentDark: "#6B2FD0",
+    dim: "#888888",
+    line: "rgba(0,0,0,0.25)",
+    fieldBorder: "#000000",
+    pill: "#ffffff",
+    pillText: "#000000",
   },
 
-  // Мультиколор-палитра 8БИТ — для частиц/конфетти.
-  palette: ["#6B5CE7", "#ffffff", "#E8E4E0", "#0c0c0c"],
+  palette: ["#873CF5", "#6B5CE7", "#000000", "#ffffff", "#888888"],
 
   fonts: {
     display: '"CoFo Driffter", "Comic Sans MS", cursive',
@@ -26,17 +27,36 @@ export const BRAND = {
   },
 
   // Брендинг.
-  brandName: "8БИТ",
-  title: "8БИТ PONG",
-  cta: "ИГРАЙ ПО-8БИТНОМУ!",
-  ctaSub: "Сканируй и переходи",
+  brandName: "БИТ",
+  title: "БИТ PONG",
+  cta: "ИГРАЙ",
+  ctaLine2: "ПО БИТНОМУ",
+  ctaSub: "Сканируй и учись!",
   url: "https://t.me/journal_yandex_education",
 
+  promoRotateSeconds: 4,
+  promoPhrases: [
+    "Физический мир\nначинается\nс движения",
+    "Улови траекторию",
+    "Управляй движением",
+    "Освой физику движения",
+    "От пикселей\nк роботам",
+  ],
+
   layout: {
-    fieldWidthRatio: 0.68,
-    fieldHeightRatio: 0.58,
+    // Точные пропорции игрового экрана из Figma (716×452, поле 446×284 @ 135,77).
+    fieldWidthRatio: 446 / 716,
+    fieldHeightRatio: 284 / 452,
+    fieldTopRatio: 77 / 452,
     fieldRadiusRatio: 0.02,
     controlsInsetRatio: 0.035,
+    // Размеры шрифтов из макета (px при 452pt высоты).
+    type: {
+      titlePong: 43 / 452,
+      playerLabel: 13 / 452,
+      pillLabel: 15 / 452,
+      promoLabel: 11 / 452,
+    },
   },
 
   // Игровые параметры.

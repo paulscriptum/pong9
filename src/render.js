@@ -4,87 +4,52 @@
 // ===========================================================
 
 import BRAND from "./brand.js";
-import {
-  drawPixelNumber,
-  drawBug,
-  drawStar,
-} from "./mascots.js";
+import { drawPixelNumber } from "./mascots.js";
 
-// Загружаем PNG изображения из архива
-const caterpillarImg = new Image();
-caterpillarImg.crossOrigin = "anonymous";
-caterpillarImg.src = "/images/left_paddle_caterpillar.png";
+function loadImage(src) {
+  const img = new Image();
+  img.crossOrigin = "anonymous";
+  img.src = src;
+  return img;
+}
 
-const spikyImg = new Image();
-spikyImg.crossOrigin = "anonymous";
-spikyImg.src = "/images/right_paddle_spiky.png";
+// Игровые объекты (ассеты из макета)
+const paddleLeftImg = loadImage("/images/ui/paddle_left.png");
+const paddleRightImg = loadImage("/images/ui/paddle_right.png");
+const ballImg = loadImage("/images/ui/ball_apple.png");
 
-// Мяч - оригинальный чип с лицом и "ножками"
-const ballImg = new Image();
-ballImg.crossOrigin = "anonymous";
-ballImg.src = "/images/ball.png";
+// UI редизайна
+const fieldFrameImg = loadImage("/images/ui/field_frame.png?v=6");
 
-// Рамка игрового поля (hand-drawn style)
-const frameBorderImg = new Image();
-frameBorderImg.crossOrigin = "anonymous";
-frameBorderImg.src = "/images/frame_border.svg";
+function fieldFrameInsets() {
+  // Внутренние отступы белой зоны в ассете 4526×2906.
+  return { insetX: 17 / 4526, insetY: 32 / 2906 };
+}
 
-// UI элементы из архива
-const titleImg = new Image();
-titleImg.crossOrigin = "anonymous";
-titleImg.src = "/images/title_8bit_pong.png";
-
-
-const logoYandexAcademyImg = new Image();
-logoYandexAcademyImg.crossOrigin = "anonymous";
-logoYandexAcademyImg.src = "/images/logo_yandex_academy.png?v=1";
-
-const speechBubbleImg = new Image();
-speechBubbleImg.crossOrigin = "anonymous";
-speechBubbleImg.src = "/images/speech_bubble_play_8bit.png";
-
-const labelPlayer1Img = new Image();
-labelPlayer1Img.crossOrigin = "anonymous";
-labelPlayer1Img.src = "/images/label_player_1.png";
-
-const labelPlayer2Img = new Image();
-labelPlayer2Img.crossOrigin = "anonymous";
-labelPlayer2Img.src = "/images/label_player_2.png";
-
-const buttonZanovoImg = new Image();
-buttonZanovoImg.crossOrigin = "anonymous";
-buttonZanovoImg.src = "/images/button_zanovo.png?v=5";
-
-const buttonRezhimSnaImg = new Image();
-buttonRezhimSnaImg.crossOrigin = "anonymous";
-buttonRezhimSnaImg.src = "/images/button_rezhim_sna.png?v=14";
-
-// Декоративные элементы (doodles)
-const doodleBottomLeftImg = new Image();
-doodleBottomLeftImg.crossOrigin = "anonymous";
-doodleBottomLeftImg.src = "/images/doodle_bottom_left.png";
-
-const doodleBottomRightImg = new Image();
-doodleBottomRightImg.crossOrigin = "anonymous";
-doodleBottomRightImg.src = "/images/doodle_bottom_right.png";
-
-// Иконки игроков (маскоты рядом с лейблами)
-const iconPlayer1Img = new Image();
-iconPlayer1Img.crossOrigin = "anonymous";
-iconPlayer1Img.src = "/images/icon_player_1.png";
-
-const iconPlayer2Img = new Image();
-iconPlayer2Img.crossOrigin = "anonymous";
-iconPlayer2Img.src = "/images/icon_player_2.png";
-
-// Кнопки управления из архива
-const buttonLeftImg = new Image();
-buttonLeftImg.crossOrigin = "anonymous";
-buttonLeftImg.src = "/images/button_left.png";
-
-const buttonRightImg = new Image();
-buttonRightImg.crossOrigin = "anonymous";
-buttonRightImg.src = "/images/button_right.png";
+function fieldFrameDrawRect(field) {
+  const { insetX, insetY } = fieldFrameInsets();
+  const w = field.w / (1 - 2 * insetX);
+  const h = field.h / (1 - 2 * insetY);
+  return {
+    x: field.x - w * insetX,
+    y: field.y - h * insetY,
+    w,
+    h,
+  };
+}
+const bgWinImg = loadImage("/images/ui/bg_win.png");
+const starburstImg = loadImage("/images/ui/starburst.png");
+const logoBitImg = loadImage("/images/ui/logo_bit.png");
+const centerMascotImg = loadImage("/images/ui/center_mascot.png");
+// Трофей — два слоя как в макете: белая подложка-аутлайн + чёрный кубок
+const iconTrophyWhiteImg = loadImage("/images/ui/icon_trophy_white.png");
+const iconTrophyBlackImg = loadImage("/images/ui/icon_trophy_black.png");
+const iconSleepHandImg = loadImage("/images/ui/icon_sleep_hand.png");
+const speechBubbleImg = loadImage("/images/ui/speech_bubble.png");
+const uiIconPlayer1Img = loadImage("/images/ui/icon_player_1.png");
+const uiIconPlayer2Img = loadImage("/images/ui/icon_player_2.png");
+const pillRestartImg = loadImage("/images/ui/pill_restart.png");
+const pillSleepImg = loadImage("/images/ui/pill_sleep.png");
 
 // Маскоты для эффектов при отбивании и голах (PNG с прозрачным фоном)
 const mascotImages = [];
@@ -102,8 +67,8 @@ const mascotPaths = [
   "/images/mascots/sad.svg"      // 10
 ];
 
-// Маскоты в исходниках тёмные — на чёрном поле рисуем через invert(1).
-const mascotSizeScale = { 5: 0.5 };
+const mascotSizeScale = { 1: 1.2, 5: 0.5 };
+const mascotInvertOnField = false;
 mascotPaths.forEach((path, i) => {
   mascotImages[i] = new Image();
   mascotImages[i].crossOrigin = "anonymous";
@@ -122,44 +87,107 @@ function drawRotated180(ctx, img, x, y, w, h) {
   drawRotated(ctx, img, x, y, w, h, Math.PI);
 }
 
+// Метрики «БИТ» в logo_bit.png (297px высота).
+const LOGO_BIT_TOP = 42 / 297;
+const LOGO_BIT_CAP = 238 / 297;
+const LOGO_BIT_BASELINE = 280 / 297;
+const WIN_BG_SCALE = 1.15;
+const PROMO_BUBBLE = {
+  textAlignX: -0.32,
+  textOffsetY: -0.1,
+  lineHeight: 1.16,
+  baseHeightRatio: 0.073,
+  minScale: 0.42,
+  maxScale: 1.65,
+  padRight: 0.22,
+  padTop: 0.18,
+  padBottom: 0.14,
+  rightEdge: 0.34,
+  sizeScale: 1.15,
+  textPadX: 4,
+  textPadY: 3,
+};
+
+const FIGMA = {
+  w: 716,
+  h: 452,
+  field: { x: 135, y: 77, w: 446, h: 284 },
+  titleY: 41.5,
+  buttonSize: 34,
+};
+
+// Боковые контролы — доли от gutter (Figma 716×452, поле @ 135, gutter = 135px).
+const REF_CONTROLS = {
+  btnInset: 48 / 135,
+  iconGap: 31 / 135, // подпись на оси кнопок, иконка ближе к полю
+  spreadY: 0.267,
+  midYOffset: 0.012,
+};
+
 export function computeSceneLayout(w, h) {
   const min = Math.min(w, h);
+  const fieldW = w * BRAND.layout.fieldWidthRatio;
   const fieldH = h * BRAND.layout.fieldHeightRatio;
-  const fieldW = Math.min(w * BRAND.layout.fieldWidthRatio, fieldH * 1.8);
   const field = {
     w: fieldW,
     h: fieldH,
     x: (w - fieldW) / 2,
-    y: h * 0.22,
+    y: h * BRAND.layout.fieldTopRatio,
   };
-  field.r = min * 0.02;
+  field.r = min * BRAND.layout.fieldRadiusRatio;
 
-  const sideGap = field.x;
-  const controlSize = Math.max(48, Math.min(80, min * 0.06));
-  const controlGap = min * 0.018;
-  const controlsY = field.y + field.h * 0.55;
-  const labelY = controlsY - (controlSize * 2 + controlGap) / 2 - min * 0.07;
+  // Визуальные границы поля (PNG с рамкой) — к ним привязаны боковые кнопки.
+  const frameDraw = fieldFrameDrawRect(field);
+  const visual = {
+    x: frameDraw.x,
+    y: frameDraw.y,
+    w: frameDraw.w,
+    h: frameDraw.h,
+  };
+
+  const gutter = visual.x;
+  const gutterR = w - visual.x - visual.w;
+
+  const controlSize = Math.max(44, Math.min(90, min * (FIGMA.buttonSize / FIGMA.h)));
+  const type = BRAND.layout.type;
+  const rc = REF_CONTROLS;
+  const btnSpreadY = visual.h * rc.spreadY;
+  const fieldMidY = visual.y + visual.h / 2;
+  const midY = fieldMidY + visual.h * rc.midYOffset;
+  const colLeftX = gutter * rc.btnInset;
+  const colRightX = w - gutterR * rc.btnInset;
+  const iconGapX = gutter * rc.iconGap;
 
   return {
     min,
     field,
     title: {
       x: w / 2,
-      y: field.y * 0.45,
-      w: Math.min(field.w * 0.5, w * 0.4),
-      h: min * 0.065,
+      y: h * (FIGMA.titleY / FIGMA.h),
+      logoH: min * (37 / FIGMA.h),
+      pongSize: min * type.titlePong,
     },
     controls: {
       size: controlSize,
-      gap: controlGap,
-      y: controlsY,
-      leftX: Math.max(min * 0.018, (sideGap - controlSize) / 2),
-      rightX: Math.max(min * 0.018, (sideGap - controlSize) / 2),
-      labelY,
+      leftUp: { x: colLeftX, y: fieldMidY - btnSpreadY },
+      leftDown: { x: colLeftX, y: fieldMidY + btnSpreadY },
+      rightUp: { x: colRightX, y: fieldMidY - btnSpreadY },
+      rightDown: { x: colRightX, y: fieldMidY + btnSpreadY },
+      labelLeft: { x: colLeftX, y: midY },
+      labelRight: { x: colRightX, y: midY },
+      iconLeft: { x: colLeftX + iconGapX, y: midY },
+      iconRight: { x: colRightX - iconGapX, y: midY },
+      playerLabelSize: min * type.playerLabel,
+      iconLeftSize: min * (38 / FIGMA.h),
+      iconRightSize: min * (39 / FIGMA.h),
     },
     bottomButtons: {
-      y: field.y + field.h + min * 0.05,
-      h: min * 0.045,
+      y: field.y + field.h + h * (33 / FIGMA.h),
+      h: h * (22 / FIGMA.h),
+      fontSize: min * type.pillLabel,
+    },
+    promo: {
+      fontSize: min * type.promoLabel,
     },
   };
 }
@@ -173,6 +201,241 @@ export class Renderer {
     this.mascotPopups = []; // Маскоты, появляющиеся при отбивании/голах
     this.layout = computeSceneLayout(0, 0);
     this.bottomButtonRects = null;
+    this.promoPhrase = BRAND.promoPhrases[0];
+    this.promoTimer = 0;
+    this.promoAnim = 1;
+    this.promoDeck = [];
+    this.promoDeckIdx = 0;
+    this._pickPromoPhrase();
+  }
+
+  _shufflePromoDeck(exclude = "") {
+    const phrases = [...BRAND.promoPhrases];
+    for (let i = phrases.length - 1; i > 0; i--) {
+      const j = (Math.random() * (i + 1)) | 0;
+      [phrases[i], phrases[j]] = [phrases[j], phrases[i]];
+    }
+    if (phrases.length > 1 && phrases[0] === exclude) {
+      [phrases[0], phrases[1]] = [phrases[1], phrases[0]];
+    }
+    this.promoDeck = phrases;
+    this.promoDeckIdx = 0;
+  }
+
+  _pickPromoPhrase(exclude = "") {
+    const phrases = BRAND.promoPhrases;
+    if (!phrases.length) return;
+    if (phrases.length === 1) {
+      this.promoPhrase = phrases[0];
+      return;
+    }
+    if (!this.promoDeck.length || this.promoDeckIdx >= this.promoDeck.length) {
+      this._shufflePromoDeck(exclude);
+    }
+    this.promoPhrase = this.promoDeck[this.promoDeckIdx++];
+  }
+
+  updatePromo(dt) {
+    this.promoTimer += dt;
+    if (this.promoAnim < 1) {
+      this.promoAnim = Math.min(1, this.promoAnim + dt / 0.35);
+    }
+    if (this.promoTimer >= BRAND.promoRotateSeconds) {
+      this.promoTimer = 0;
+      this.promoAnim = 0;
+      this._pickPromoPhrase(this.promoPhrase);
+    }
+  }
+
+  _promoHasHardBreaks(text) {
+    return String(text).includes("\n");
+  }
+
+  _promoHardLines(ctx, text, startSize) {
+    ctx.font = `700 ${startSize}px ${BRAND.fonts.ui}`;
+    const lines = String(text)
+      .split("\n")
+      .map((part) => part.trim())
+      .filter(Boolean);
+    const lineH = startSize * PROMO_BUBBLE.lineHeight;
+    const blockH = lines.length * lineH;
+    const maxLineW = Math.max(0, ...lines.map((line) => ctx.measureText(line).width));
+    return { lines, size: startSize, lineH, blockH, maxLineW };
+  }
+
+  _wrapTextLines(ctx, text, maxW) {
+    const parts = String(text).split("\n");
+    const lines = [];
+    for (const part of parts) {
+      const chunk = part.trim();
+      if (!chunk) continue;
+      const words = chunk.split(/\s+/).filter(Boolean);
+      if (!words.length) continue;
+      let line = words[0];
+      for (let i = 1; i < words.length; i++) {
+        const test = `${line} ${words[i]}`;
+        if (ctx.measureText(test).width <= maxW) line = test;
+        else {
+          lines.push(line);
+          line = words[i];
+        }
+      }
+      lines.push(line);
+    }
+    return lines;
+  }
+
+  _promoTextInset() {
+    const scale = this.h / FIGMA.h;
+    return {
+      x: PROMO_BUBBLE.textPadX * scale,
+      y: PROMO_BUBBLE.textPadY * scale,
+    };
+  }
+
+  _fitPromoText(ctx, text, maxW, maxH, startSize) {
+    const lineHeight = PROMO_BUBBLE.lineHeight;
+    let size = startSize;
+    const minSize = Math.max(6, startSize * 0.65);
+    while (size >= minSize) {
+      ctx.font = `700 ${size}px ${BRAND.fonts.ui}`;
+      const lines = this._wrapTextLines(ctx, text, maxW);
+      const lineH = size * lineHeight;
+      const blockH = lines.length * lineH;
+      const maxLineW = Math.max(0, ...lines.map((line) => ctx.measureText(line).width));
+      if (blockH <= maxH && maxLineW <= maxW) {
+        return { lines, size, lineH, blockH, maxLineW };
+      }
+      size -= 0.5;
+    }
+    ctx.font = `700 ${minSize}px ${BRAND.fonts.ui}`;
+    const lines = this._wrapTextLines(ctx, text, maxW);
+    const lineH = minSize * lineHeight;
+    return {
+      lines,
+      size: minSize,
+      lineH,
+      blockH: lines.length * lineH,
+      maxLineW: Math.max(0, ...lines.map((line) => ctx.measureText(line).width)),
+    };
+  }
+
+  _promoTextBounds(bubbleW, bubbleH, fit) {
+    const inset = this._promoTextInset();
+    const textX = bubbleW * PROMO_BUBBLE.textAlignX + inset.x;
+    const textOy = bubbleH * PROMO_BUBBLE.textOffsetY + inset.y;
+    const padR = fit.size * PROMO_BUBBLE.padRight;
+    const padT = fit.size * PROMO_BUBBLE.padTop;
+    const padB = fit.size * PROMO_BUBBLE.padBottom;
+    const widthSpan = PROMO_BUBBLE.rightEdge - PROMO_BUBBLE.textAlignX;
+    const maxLineW = Math.max(0, bubbleW * widthSpan - padR - inset.x);
+    const topNeed = 0.5 + PROMO_BUBBLE.textOffsetY;
+    const botNeed = 0.5 - PROMO_BUBBLE.textOffsetY;
+    const maxBlockH = Math.max(0, bubbleH * Math.min(topNeed, botNeed) * 2 - padT - padB - inset.y);
+    return { textX, textOy, maxLineW, maxBlockH, topNeed, botNeed };
+  }
+
+  _promoBubbleSize(fit) {
+    const inset = this._promoTextInset();
+    const padR = fit.size * PROMO_BUBBLE.padRight;
+    const padT = fit.size * PROMO_BUBBLE.padTop;
+    const padB = fit.size * PROMO_BUBBLE.padBottom;
+    const widthSpan = PROMO_BUBBLE.rightEdge - PROMO_BUBBLE.textAlignX;
+    const topNeed = 0.5 + PROMO_BUBBLE.textOffsetY;
+    const botNeed = 0.5 - PROMO_BUBBLE.textOffsetY;
+    const bubbleW = ((fit.maxLineW + padR + inset.x) / widthSpan) * PROMO_BUBBLE.sizeScale;
+    const bubbleH =
+      Math.max(
+        (fit.blockH / 2 + padT + inset.y) / topNeed,
+        (fit.blockH / 2 + padB) / botNeed
+      ) * PROMO_BUBBLE.sizeScale;
+    return { bubbleW, bubbleH };
+  }
+
+  _layoutPromoLines(ctx, text, startSize, maxWrapW) {
+    if (this._promoHasHardBreaks(text)) {
+      return this._promoHardLines(ctx, text, startSize);
+    }
+    ctx.font = `700 ${startSize}px ${BRAND.fonts.ui}`;
+    const lines = this._wrapTextLines(ctx, text, maxWrapW);
+    const lineH = startSize * PROMO_BUBBLE.lineHeight;
+    const blockH = lines.length * lineH;
+    const maxLineW = Math.max(0, ...lines.map((line) => ctx.measureText(line).width));
+    return { lines, size: startSize, lineH, blockH, maxLineW };
+  }
+
+  _promoMaxLineWrap(startSize) {
+    const aspect =
+      speechBubbleImg.complete && speechBubbleImg.naturalWidth > 0
+        ? speechBubbleImg.naturalWidth / speechBubbleImg.naturalHeight
+        : 1.79;
+    const maxH = this.h * PROMO_BUBBLE.baseHeightRatio * PROMO_BUBBLE.maxScale;
+    const maxW = maxH * aspect;
+    const widthSpan = PROMO_BUBBLE.rightEdge - PROMO_BUBBLE.textAlignX;
+    const padR = startSize * PROMO_BUBBLE.padRight;
+    const inset = this._promoTextInset();
+    return Math.max(0, (maxW * widthSpan - padR - inset.x) / PROMO_BUBBLE.sizeScale);
+  }
+
+  _layoutPromoBubble(text) {
+    const ctx = this.ctx;
+    const aspect =
+      speechBubbleImg.complete && speechBubbleImg.naturalWidth > 0
+        ? speechBubbleImg.naturalWidth / speechBubbleImg.naturalHeight
+        : 1.79;
+    const baseH = this.h * PROMO_BUBBLE.baseHeightRatio;
+    const minH = baseH * PROMO_BUBBLE.minScale;
+    const maxH = baseH * PROMO_BUBBLE.maxScale;
+    const minW = minH * aspect * 0.82;
+    const maxW = maxH * aspect;
+    const startSize = Math.max(7, (this.layout.promo?.fontSize ?? this.h * 0.0165) * 0.82);
+    const maxLineWrapW = this._promoMaxLineWrap(startSize);
+
+    const layoutOnce = (size, wrapW) => {
+      const hardBreaks = this._promoHasHardBreaks(text);
+      let fit = this._layoutPromoLines(ctx, text, size, wrapW);
+      let bubbleW;
+      let bubbleH;
+      let bounds;
+
+      if (!hardBreaks) {
+        for (let i = 0; i < 4; i++) {
+          ({ bubbleW, bubbleH } = this._promoBubbleSize(fit));
+          bubbleW = Math.max(minW, Math.min(maxW, bubbleW));
+          bubbleH = Math.max(minH, Math.min(maxH, bubbleH));
+          bounds = this._promoTextBounds(bubbleW, bubbleH, fit);
+          if (fit.blockH <= bounds.maxBlockH && fit.maxLineW <= bounds.maxLineW) break;
+          const refit = this._layoutPromoLines(ctx, text, size, bounds.maxLineW);
+          if (refit.lines.join("|") === fit.lines.join("|")) {
+            fit = refit;
+            break;
+          }
+          fit = refit;
+        }
+      } else {
+        ({ bubbleW, bubbleH } = this._promoBubbleSize(fit));
+        bubbleW = Math.max(minW, Math.min(maxW, bubbleW));
+        bubbleH = Math.max(minH, Math.min(maxH, bubbleH));
+      }
+
+      bounds = this._promoTextBounds(bubbleW, bubbleH, fit);
+      return { fit, bubbleW, bubbleH, bounds };
+    };
+
+    let { fit, bubbleW, bubbleH, bounds } = layoutOnce(startSize, maxLineWrapW);
+
+    if (fit.blockH > bounds.maxBlockH || fit.maxLineW > bounds.maxLineW) {
+      let size = startSize;
+      const minSize = Math.max(6, startSize * 0.65);
+      while (size >= minSize) {
+        ({ fit, bubbleW, bubbleH, bounds } = layoutOnce(size, this._promoMaxLineWrap(size)));
+        if (fit.blockH <= bounds.maxBlockH && fit.maxLineW <= bounds.maxLineW) break;
+        size -= 0.5;
+      }
+    }
+
+    bounds = this._promoTextBounds(bubbleW, bubbleH, fit);
+    return { bubbleW, bubbleH, fit, baseH, ...bounds };
   }
 
   getBottomButtonRects() {
@@ -320,9 +583,8 @@ export class Renderer {
       
       ctx.globalAlpha = Math.min(1, m.scale * 1.5);
       
-      ctx.filter = "invert(1)";
+      if (mascotInvertOnField) ctx.filter = "invert(1)";
       ctx.drawImage(img, m.x - drawW / 2, m.y - drawH / 2, drawW, drawH);
-      
       ctx.filter = "none";
     }
     
@@ -341,390 +603,314 @@ export class Renderer {
     const { field, title, controls, min, bottomButtons } = this.layout;
     ctx.save();
 
-    // Светлый фон
     ctx.fillStyle = BRAND.colors.bg;
     ctx.fillRect(0, 0, this.w, this.h);
 
-    // Декоративные элементы (doodles из PNG)
-    this.drawDecorations(t);
-
-    // Заголовок (PNG из архива)
     this.drawTitleBanner(title, min);
+    this.drawPlayerLabels(controls);
+    this.drawFieldFrame(field);
 
-    // Спич-баббл справа (PNG из архива)
-    this.drawSpeechBubble(t);
+    this.drawBottomButtons(bottomButtons, field);
 
-    // Лого слева
-    this.drawLogo(min);
+    ctx.restore();
+  }
 
-    // Лейблы игроков (PNG из архива)
-    this.drawPlayerLabels(controls, min);
+  drawFieldFrame(field) {
+    const ctx = this.ctx;
+    const rect = fieldFrameDrawRect(field);
 
-    // Рамка поля - используем SVG frame_border
-    this.drawFieldFrame(field, min);
+    if (fieldFrameImg.complete && fieldFrameImg.naturalWidth > 0) {
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = "high";
+      ctx.drawImage(fieldFrameImg, rect.x, rect.y, rect.w, rect.h);
+      return;
+    }
 
-    // Внутреннее черное поле
     ctx.fillStyle = BRAND.colors.field;
     ctx.beginPath();
     ctx.roundRect(field.x, field.y, field.w, field.h, field.r);
     ctx.fill();
-
-    // Нижние кнопки (PNG из архива)
-    this.drawBottomButtons(bottomButtons, field, min);
-
-    ctx.restore();
-  }
-  
-  drawFieldFrame(field, min) {
-    const ctx = this.ctx;
-    const padding = min * 0.015;
-    
-    // Простая фиолетовая рамка с скругленными углами
-    ctx.strokeStyle = BRAND.colors.accent;
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.roundRect(field.x - padding, field.y - padding, field.w + padding * 2, field.h + padding * 2, field.r + padding);
+    ctx.strokeStyle = BRAND.colors.fieldBorder;
+    ctx.lineWidth = 2.5;
     ctx.stroke();
   }
 
+  // Заголовок: лого «✳БИТ» (графика) + «PONG» текстом, по центру.
   drawTitleBanner(title, min) {
     const ctx = this.ctx;
-    const cx = title.x;
     const cy = title.y;
-
-    // Используем PNG заголовка из архива
-    if (titleImg.complete && titleImg.naturalWidth > 0) {
-      const imgH = title.h * 1.2;
-      const imgW = (titleImg.naturalWidth / titleImg.naturalHeight) * imgH;
-      ctx.drawImage(titleImg, cx - imgW / 2, cy - imgH / 2, imgW, imgH);
-    } else {
-      // Fallback - рисуем программно
-      const bannerW = title.w;
-      const bannerH = title.h * 1.4;
-
-      ctx.save();
-      ctx.fillStyle = BRAND.colors.accent;
-      ctx.beginPath();
-      
-      const points = 24;
-      const baseR = bannerW / 2;
-      const baseRy = bannerH / 2;
-      for (let i = 0; i <= points; i++) {
-        const angle = (i / points) * Math.PI * 2;
-        const wobble = 1 + Math.sin(angle * 6) * 0.08;
-        const rx = baseR * wobble;
-        const ry = baseRy * wobble;
-        const px = cx + Math.cos(angle) * rx;
-        const py = cy + Math.sin(angle) * ry;
-        if (i === 0) ctx.moveTo(px, py);
-        else ctx.lineTo(px, py);
-      }
-      ctx.closePath();
-      ctx.fill();
-
-      ctx.font = `500 ${title.h * 0.5}px ${BRAND.fonts.brand}`;
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillStyle = "#ffffff";
-      ctx.fillText(BRAND.title, cx, cy);
-      ctx.restore();
-    }
-  }
-
-  drawSpeechBubble(t) {
-    const ctx = this.ctx;
-    const { field, min } = this.layout;
-    const bx = field.x + field.w + min * 0.03;
-    const by = field.y - min * 0.02;
-
-    // Используем PNG speech bubble из архива
-    if (speechBubbleImg.complete && speechBubbleImg.naturalWidth > 0) {
-      const imgH = min * 0.08;
-      const imgW = (speechBubbleImg.naturalWidth / speechBubbleImg.naturalHeight) * imgH;
-      ctx.drawImage(speechBubbleImg, bx, by - imgH * 0.3, imgW, imgH);
-    } else {
-      // Fallback
-      const bw = min * 0.16;
-      const bh = min * 0.05;
-
-      ctx.save();
-      ctx.fillStyle = BRAND.colors.bg;
-      ctx.strokeStyle = BRAND.colors.text;
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      ctx.roundRect(bx, by, bw, bh, 4);
-      ctx.fill();
-      ctx.stroke();
-
-      ctx.font = `500 ${min * 0.014}px ${BRAND.fonts.brand}`;
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillStyle = BRAND.colors.text;
-      ctx.fillText(BRAND.cta, bx + bw / 2, by + bh / 2);
-      drawBug(ctx, bx + bw * 0.92, by - min * 0.008, min * 0.024, BRAND.colors.text);
-      ctx.restore();
-    }
-  }
-
-  drawLogo(min) {
-    const ctx = this.ctx;
-    const { field } = this.layout;
-    const lx = field.x;
-    const ly = field.y * 0.42;
+    const logoH = title.logoH ?? min * 0.082;
+    const pongSize = title.pongSize ?? min * 0.095;
+    const gap = min * (8 / FIGMA.h);
 
     ctx.save();
+    ctx.font = `700 ${pongSize}px ${BRAND.fonts.brand}`;
+    ctx.fillStyle = BRAND.colors.text;
 
-    if (logoYandexAcademyImg.complete && logoYandexAcademyImg.naturalWidth > 0) {
-      const imgH = min * 0.045;
-      const imgW =
-        (logoYandexAcademyImg.naturalWidth / logoYandexAcademyImg.naturalHeight) * imgH;
-      ctx.drawImage(logoYandexAcademyImg, lx, ly - imgH / 2, imgW, imgH);
-    } else {
-      ctx.font = `700 ${min * 0.032}px ${BRAND.fonts.brand}`;
+    if (logoBitImg.complete && logoBitImg.naturalWidth > 0) {
+      const logoW = (logoBitImg.naturalWidth / logoBitImg.naturalHeight) * logoH;
+      const pongW = ctx.measureText("PONG").width;
+      const total = logoW + gap + pongW;
+      const left = title.x - total / 2;
+      ctx.drawImage(logoBitImg, left, cy - logoH / 2, logoW, logoH);
       ctx.textAlign = "left";
-      ctx.textBaseline = "middle";
-      ctx.fillStyle = BRAND.colors.text;
-      ctx.fillText("8БИТ", lx, ly - min * 0.01);
-
-      ctx.font = `400 ${min * 0.011}px ${BRAND.fonts.ui}`;
-      ctx.fillText("Журнал", lx, ly + min * 0.022);
-      ctx.fillText("Яндекс Образования", lx, ly + min * 0.038);
+      ctx.textBaseline = "alphabetic";
+      const pongY = cy - logoH / 2 + logoH * LOGO_BIT_BASELINE;
+      ctx.fillText("PONG", left + logoW + gap, pongY);
+    } else {
+      ctx.textAlign = "center";
+      ctx.fillText(BRAND.title, title.x, cy);
     }
-
     ctx.restore();
   }
 
-  drawDecorations(t) {
+  // Лого с подписью журнала — используется на финальном экране.
+  drawBrandLogo(x, y, min) {
     const ctx = this.ctx;
-    const { field, min } = this.layout;
+    const logoH = min * 0.082;
+    ctx.save();
+    ctx.fillStyle = BRAND.colors.text;
+    let textX = x;
+
+    if (logoBitImg.complete && logoBitImg.naturalWidth > 0) {
+      const logoW = (logoBitImg.naturalWidth / logoBitImg.naturalHeight) * logoH;
+      ctx.drawImage(logoBitImg, x, y, logoW, logoH);
+      textX = x + logoW + min * 0.02;
+    } else {
+      ctx.font = `700 ${logoH * 0.8}px ${BRAND.fonts.ui}`;
+      ctx.textAlign = "left";
+      ctx.textBaseline = "top";
+      ctx.fillText(BRAND.brandName, x, y);
+      textX = x + logoH * 2.2;
+    }
+
+    const subSize = min * 0.029;
+    ctx.font = `700 ${subSize}px ${BRAND.fonts.ui}`;
+    ctx.textAlign = "left";
+    ctx.textBaseline = "middle";
+    ctx.fillText("Журнал", textX, y + logoH * 0.32);
+    ctx.fillText("Яндекс Образования", textX, y + logoH * 0.32 + subSize * 1.25);
+    ctx.restore();
+  }
+
+  // Вертикальная подпись: rotationRad = -π/2 — читается снизу вверх, +π/2 — сверху вниз.
+  drawVerticalPlayerLabel(ctx, cx, cy, text, fontSize, rotationRad) {
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(rotationRad);
+    ctx.font = `700 ${fontSize}px ${BRAND.fonts.ui}`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = BRAND.colors.text;
+    ctx.fillText(text, 0, 0);
+    ctx.restore();
+  }
+
+  drawSideIcon(ctx, img, cx, cy, h, rotationRad = 0) {
+    if (!img?.complete || !img.naturalWidth) return;
+    const w = (img.naturalWidth / img.naturalHeight) * h;
+    ctx.save();
+    ctx.translate(cx, cy);
+    if (rotationRad) ctx.rotate(rotationRad);
+    ctx.drawImage(img, -w / 2, -h / 2, w, h);
+    ctx.restore();
+  }
+
+  drawPillImage(ctx, img, x, y, w, h) {
+    if (img?.complete && img.naturalWidth > 0) {
+      ctx.drawImage(img, x, y, w, h);
+      return;
+    }
+    this.drawPill(ctx, x, y, w, h);
+  }
+
+  drawPlayerLabels(controls) {
+    const ctx = this.ctx;
+    const labelSize = controls.playerLabelSize;
+    // Слева: подпись на оси кнопок, иконка правее (к полю).
+    this.drawVerticalPlayerLabel(
+      ctx,
+      controls.labelLeft.x,
+      controls.labelLeft.y,
+      "ИГРОК 2",
+      labelSize,
+      Math.PI / 2
+    );
+    this.drawSideIcon(
+      ctx,
+      uiIconPlayer1Img,
+      controls.iconLeft.x,
+      controls.iconLeft.y,
+      controls.iconLeftSize
+    );
+    // Справа: иконка левее (к полю), подпись на оси кнопок.
+    this.drawSideIcon(
+      ctx,
+      uiIconPlayer2Img,
+      controls.iconRight.x,
+      controls.iconRight.y,
+      controls.iconRightSize
+    );
+    this.drawVerticalPlayerLabel(
+      ctx,
+      controls.labelRight.x,
+      controls.labelRight.y,
+      "ИГРОК 1",
+      labelSize,
+      -Math.PI / 2
+    );
+  }
+
+  drawPill(ctx, x, y, w, h) {
+    ctx.fillStyle = BRAND.colors.pill;
+    ctx.beginPath();
+    ctx.roundRect(x, y, w, h, h / 2);
+    ctx.fill();
+  }
+
+  drawCenterPromo(field) {
+    const ctx = this.ctx;
+    const cx = field.x + field.w / 2;
+    const fieldBottom = field.y + field.h;
+
+    // Маскот по центру под полем.
+    const mascotH = this.h * 0.111;
+    const mascotTop = fieldBottom + this.h * 0.033;
+    if (centerMascotImg.complete && centerMascotImg.naturalWidth > 0) {
+      const aspect = centerMascotImg.naturalWidth / centerMascotImg.naturalHeight;
+      const w = mascotH * aspect;
+      ctx.drawImage(centerMascotImg, cx - w / 2, mascotTop, w, mascotH);
+    }
+
+    // Спич-баббл правее маскота; размер подстраивается под текст.
+    const layout = this._layoutPromoBubble(this.promoPhrase);
+    const { bubbleW, bubbleH, fit, baseH, textX, textOy } = layout;
+    const bubbleX = cx + this.w * 0.024;
+    const bubbleY = fieldBottom + this.h * 0.013 - (bubbleH - baseH) * 0.65;
+
+    const animT = 1 - Math.pow(1 - this.promoAnim, 3);
+    const scale = 0.9 + 0.1 * animT;
+    const alpha = 0.55 + 0.45 * animT;
+    const bubbleCx = bubbleX + bubbleW / 2;
+    const bubbleCy = bubbleY + bubbleH / 2;
 
     ctx.save();
-    ctx.strokeStyle = BRAND.colors.accent;
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
+    ctx.translate(bubbleCx, bubbleCy);
+    ctx.scale(scale, scale);
+    ctx.globalAlpha = alpha;
 
-    // Анимированная волнистая линия с настраиваемой формой.
-    // cfg: { size, amp, waves, rot, speed, phase, width }
-    const drawSquiggle = (x, y, cfg) => {
-      const {
-        size,
-        amp = 0.16,
-        waves = 1.6,
-        rot = 0,
-        speed = 2,
-        phase = 0,
-        width = min * 0.006,
-      } = cfg;
-      const steps = 48;
-      ctx.save();
-      ctx.translate(x, y);
-      ctx.rotate(rot);
-      ctx.lineWidth = width;
-      ctx.beginPath();
-      for (let i = 0; i <= steps; i++) {
-        const u = i / steps;
-        const px = u * size;
-        // Затухание амплитуды к концам — линия выглядит как «мазок».
-        const envelope = Math.sin(u * Math.PI);
-        const py =
-          Math.sin(u * Math.PI * 2 * waves + t * speed + phase) *
-          size *
-          amp *
-          envelope;
-        if (i === 0) ctx.moveTo(px, py);
-        else ctx.lineTo(px, py);
+    if (speechBubbleImg.complete && speechBubbleImg.naturalWidth > 0) {
+      ctx.drawImage(speechBubbleImg, -bubbleW / 2, -bubbleH / 2, bubbleW, bubbleH);
+    } else {
+      this.drawPill(ctx, -bubbleW / 2, -bubbleH / 2, bubbleW, bubbleH);
+    }
+
+    ctx.font = `700 ${fit.size}px ${BRAND.fonts.ui}`;
+    ctx.textAlign = "left";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = BRAND.colors.pillText;
+    let ty = textOy - fit.blockH / 2 + fit.lineH / 2;
+    for (const line of fit.lines) {
+      ctx.fillText(line, textX, ty);
+      ty += fit.lineH;
+    }
+    ctx.restore();
+  }
+
+  drawBottomButtons(bottomButtons, field) {
+    const ctx = this.ctx;
+    const pillH = bottomButtons.h;
+    const pillY = bottomButtons.y;
+    const fontSize = bottomButtons.fontSize ?? pillH * 0.62;
+
+    ctx.save();
+    ctx.textBaseline = "middle";
+
+    // «Заново»: пилюля у левого края поля, кубок торчит над ней.
+    const restartW = field.w * 0.224;
+    const restartX = field.x + field.w * 0.031;
+    this.drawPillImage(ctx, pillRestartImg, restartX, pillY, restartW, pillH);
+    if (iconTrophyWhiteImg.complete && iconTrophyWhiteImg.naturalWidth > 0) {
+      const ih = pillH * 1.48;
+      const iw =
+        (iconTrophyWhiteImg.naturalWidth / iconTrophyWhiteImg.naturalHeight) * ih;
+      const ix = restartX + restartW * 0.06;
+      const iy = pillY - pillH * 0.25;
+      // Белый слой снизу даёт аутлайн на чёрном фоне, сверху чёрный кубок.
+      ctx.drawImage(iconTrophyWhiteImg, ix, iy, iw, ih);
+      if (iconTrophyBlackImg.complete && iconTrophyBlackImg.naturalWidth > 0) {
+        ctx.drawImage(iconTrophyBlackImg, ix + iw * 0.036, iy + ih * 0.022, iw * 0.929, ih * 0.969);
       }
-      ctx.stroke();
-      ctx.restore();
+    }
+    ctx.font = `700 ${fontSize}px ${BRAND.fonts.ui}`;
+    ctx.textAlign = "center";
+    ctx.fillStyle = BRAND.colors.pillText;
+    ctx.fillText("Заново", restartX + restartW * 0.62, pillY + pillH * 0.52);
+
+    // «Режим сна»: пилюля у правого края, «рука со звездой» торчит вверх.
+    const sleepW = field.w * 0.249;
+    const sleepX = field.x + field.w - sleepW;
+    this.drawPillImage(ctx, pillSleepImg, sleepX, pillY, sleepW, pillH);
+    if (iconSleepHandImg.complete && iconSleepHandImg.naturalWidth > 0) {
+      const ih = pillH * 1.9;
+      const iw = (iconSleepHandImg.naturalWidth / iconSleepHandImg.naturalHeight) * ih;
+      ctx.drawImage(iconSleepHandImg, sleepX - sleepW * 0.18, pillY + pillH - ih, iw, ih);
+    }
+    ctx.fillStyle = BRAND.colors.pillText;
+    ctx.fillText("Режим сна", sleepX + sleepW * 0.58, pillY + pillH * 0.52);
+
+    this.drawCenterPromo(field);
+
+    // Зоны нажатия (захватываем и торчащие иконки).
+    const hitPad = pillH * 0.9;
+    this.bottomButtonRects = {
+      restart: { x: restartX, y: pillY - hitPad, w: restartW, h: pillH + hitPad },
+      sleep: { x: sleepX, y: pillY - hitPad, w: sleepW, h: pillH + hitPad },
     };
 
-    // Полоски рисуем ТОЛЬКО в свободных зонах жёлобов: сверху (над
-    // лейблом игрока) и снизу (под кнопками управления), чтобы ничего
-    // не перекрывать. Центрируем по горизонтали внутри жёлоба.
-    const leftGutterC = field.x * 0.5;
-    const rightGutterC = field.x + field.w + (this.w - (field.x + field.w)) * 0.5;
-    const place = (cx, y, cfg) => drawSquiggle(cx - cfg.size / 2, y, cfg);
-
-    // Верхняя свободная зона (между верхом поля и лейблом).
-    const topY = field.y + field.h * 0.085;
-    // Нижняя свободная зона (между кнопками и низом поля).
-    const botY = field.y + field.h * 0.88;
-
-    // Левый жёлоб — две разные полоски.
-    place(leftGutterC, topY, {
-      size: min * 0.07,
-      amp: 0.24,
-      waves: 1.4,
-      rot: 0.28,
-      speed: 1.8,
-      phase: 0.0,
-      width: min * 0.007,
-    });
-    place(leftGutterC, botY, {
-      size: min * 0.088,
-      amp: 0.16,
-      waves: 2.4,
-      rot: -0.22,
-      speed: 2.5,
-      phase: 1.2,
-      width: min * 0.006,
-    });
-
-    // Правый жёлоб — другие формы/размеры для разнообразия.
-    place(rightGutterC, topY, {
-      size: min * 0.06,
-      amp: 0.28,
-      waves: 1.2,
-      rot: -0.3,
-      speed: 2.2,
-      phase: 0.7,
-      width: min * 0.008,
-    });
-    place(rightGutterC, botY, {
-      size: min * 0.08,
-      amp: 0.18,
-      waves: 2.0,
-      rot: 0.25,
-      speed: 1.6,
-      phase: 2.4,
-      width: min * 0.006,
-    });
-
-    // Звезда у верхнего правого угла (рядом со спич-бабблом).
-    drawStar(ctx, field.x + field.w + min * 0.08, field.y - min * 0.02, min * 0.012, BRAND.colors.accent, 1.5);
-
     ctx.restore();
   }
 
-  drawPlayerLabels(controls, min) {
+  // База финального экрана: чёрный фон, лого, белая «клякса» (bg_win).
+  // scale — для анимации появления (масштаб вокруг центра кляксы).
+  // Возвращает рект кляксы в полном (НЕмасштабированном) размере.
+  drawFinalChrome(scale = 1) {
     const ctx = this.ctx;
+    const min = Math.min(this.w, this.h) || 1;
 
-    // Используем PNG лейблы из архива
-    const usePngLabels = labelPlayer1Img.complete && labelPlayer1Img.naturalWidth > 0;
-    
-    if (usePngLabels) {
-      // Лейблы уже вертикальные в PNG, поэтому ставим их рядом с иконками.
-      const labelH = min * 0.09;
-      const labelW = (labelPlayer1Img.naturalWidth / labelPlayer1Img.naturalHeight) * labelH;
-      const iconH = min * 0.04;
-      const gap = min * 0.012;
-      const leftCenterX = controls.leftX + controls.size / 2;
-      const rightCenterX = this.w - controls.rightX - controls.size / 2;
-      const leftY = controls.labelY - labelH / 2;
-      
-      if (iconPlayer1Img.complete && iconPlayer1Img.naturalWidth > 0) {
-        const iconW = (iconPlayer1Img.naturalWidth / iconPlayer1Img.naturalHeight) * iconH;
-        const groupW = labelW + gap + iconW;
-        const labelX = leftCenterX - groupW / 2;
-        const iconX = labelX + labelW + gap;
-        drawRotated180(ctx, labelPlayer1Img, labelX, leftY, labelW, labelH);
-        drawRotated(ctx, iconPlayer1Img, iconX, controls.labelY - iconH / 2, iconW, iconH, Math.PI / 2);
+    ctx.fillStyle = BRAND.colors.bg;
+    ctx.fillRect(0, 0, this.w, this.h);
+
+    const bgAspect = bgWinImg.naturalWidth / bgWinImg.naturalHeight || 1024 / 599;
+    let bw = this.w * 0.716 * WIN_BG_SCALE;
+    let bh = bw / bgAspect;
+    const maxBh = this.h * 0.72 * WIN_BG_SCALE;
+    if (bh > maxBh) {
+      bh = maxBh;
+      bw = bh * bgAspect;
+    }
+    const cx = this.w * 0.487;
+    const cy = this.h * 0.484;
+    const sw = bw * scale;
+    const sh = bh * scale;
+
+    if (scale > 0.001) {
+      if (bgWinImg.complete && bgWinImg.naturalWidth > 0) {
+        ctx.drawImage(bgWinImg, cx - sw / 2, cy - sh / 2, sw, sh);
+      } else if (starburstImg.complete && starburstImg.naturalWidth > 0) {
+        ctx.drawImage(starburstImg, cx - sw / 2, cy - sh / 2, sw, sh);
       } else {
-        drawRotated180(ctx, labelPlayer1Img, leftCenterX - labelW / 2, leftY, labelW, labelH);
+        ctx.fillStyle = BRAND.colors.pill;
+        ctx.beginPath();
+        ctx.ellipse(cx, cy, sw / 2, sh / 2, 0, 0, Math.PI * 2);
+        ctx.fill();
       }
-      
-      // Правый игрок - PNG
-      if (labelPlayer2Img.complete && labelPlayer2Img.naturalWidth > 0) {
-        const labelH2 = labelH;
-        const labelW2 = (labelPlayer2Img.naturalWidth / labelPlayer2Img.naturalHeight) * labelH2;
-        const rightY = controls.labelY - labelH2 / 2;
-        if (iconPlayer2Img.complete && iconPlayer2Img.naturalWidth > 0) {
-          const iconW = (iconPlayer2Img.naturalWidth / iconPlayer2Img.naturalHeight) * iconH;
-          const groupW = iconW + gap + labelW2;
-          const iconX = rightCenterX - groupW / 2;
-          const labelX = iconX + iconW + gap;
-          drawRotated(ctx, iconPlayer2Img, iconX, controls.labelY - iconH / 2, iconW, iconH, -Math.PI / 2);
-          ctx.drawImage(labelPlayer2Img, labelX, rightY, labelW2, labelH2);
-        } else {
-          ctx.drawImage(labelPlayer2Img, rightCenterX - labelW2 / 2, rightY, labelW2, labelH2);
-        }
-      }
-    } else {
-      // Fallback - рисуем программно
-      const labelW = min * 0.055;
-      const labelH = min * 0.018;
-
-      ctx.save();
-
-      // Левый игрок
-      ctx.save();
-      ctx.translate(controls.leftX + controls.size / 2, controls.labelY);
-      ctx.rotate(-Math.PI / 2);
-      ctx.fillStyle = BRAND.colors.accent;
-      ctx.beginPath();
-      ctx.roundRect(-labelW / 2, -labelH / 2, labelW, labelH, 3);
-      ctx.fill();
-      ctx.font = `500 ${min * 0.012}px ${BRAND.fonts.brand}`;
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillStyle = "#ffffff";
-      ctx.fillText("ИГРОК 1", 0, 0);
-      ctx.restore();
-
-      // Правый игрок
-      ctx.save();
-      ctx.translate(this.w - controls.rightX - controls.size / 2, controls.labelY);
-      ctx.rotate(Math.PI / 2);
-      ctx.fillStyle = BRAND.colors.accent;
-      ctx.beginPath();
-      ctx.roundRect(-labelW / 2, -labelH / 2, labelW, labelH, 3);
-      ctx.fill();
-      ctx.font = `500 ${min * 0.012}px ${BRAND.fonts.brand}`;
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillStyle = "#ffffff";
-      ctx.fillText("ИГРОК 2", 0, 0);
-      ctx.restore();
-
-      // Маскоты
-      drawBug(ctx, controls.leftX + controls.size / 2, controls.labelY - min * 0.055, min * 0.018, BRAND.colors.accent);
-      drawBug(ctx, this.w - controls.rightX - controls.size / 2, controls.labelY - min * 0.055, min * 0.018, BRAND.colors.accent);
-
-      ctx.restore();
-    }
-  }
-
-  drawBottomButtons(bottomButtons, field, min) {
-    const ctx = this.ctx;
-    const btnH = bottomButtons.h * 1.2;
-    const btnY = bottomButtons.y;
-
-    // Обрезка прозрачных полей PNG (нормализованные границы непрозрачной области).
-    const trimRect = (x, y, w, h, norm) => ({
-      x: x + w * norm.x,
-      y: y + h * norm.y,
-      w: w * norm.w,
-      h: h * norm.h,
-    });
-
-    const zanovoTrim = { x: 16 / 1024, y: 25 / 341, w: 983 / 1024, h: 278 / 341 };
-
-    ctx.save();
-
-    let restartRect = null;
-    let sleepRect = null;
-
-    if (buttonZanovoImg.complete && buttonZanovoImg.naturalWidth > 0) {
-      const imgH = btnH;
-      const imgW = (buttonZanovoImg.naturalWidth / buttonZanovoImg.naturalHeight) * imgH;
-      const restartX = field.x;
-      ctx.drawImage(buttonZanovoImg, restartX, btnY, imgW, imgH);
-      restartRect = trimRect(restartX, btnY, imgW, imgH, zanovoTrim);
     }
 
-    if (buttonRezhimSnaImg.complete && buttonRezhimSnaImg.naturalWidth > 0) {
-      const imgH = btnH * 1.2;
-      const imgW = (buttonRezhimSnaImg.naturalWidth / buttonRezhimSnaImg.naturalHeight) * imgH;
-      const sleepX = field.x + field.w - imgW;
-      const sleepY = btnY - (imgH - btnH) / 2;
-      ctx.drawImage(buttonRezhimSnaImg, sleepX, sleepY, imgW, imgH);
-      sleepRect = { x: sleepX, y: sleepY, w: imgW, h: imgH };
-    }
+    // Лого и подпись — поверх кляксы.
+    this.drawBrandLogo(this.w * 0.039, this.h * 0.055, min);
 
-    this.bottomButtonRects =
-      restartRect && sleepRect ? { restart: restartRect, sleep: sleepRect } : null;
-
-    ctx.restore();
+    return { x: cx - bw / 2, y: cy - bh / 2, w: bw, h: bh, cx, cy };
   }
 
   drawFieldNet() {
@@ -742,7 +928,7 @@ export class Renderer {
     ctx.restore();
   }
 
-  drawPlayfield(state, t = 0) {
+  drawPlayfield(state, t = 0, opts = {}) {
     const ctx = this.ctx;
     const f = this.layout.field;
     this.drawChrome(t);
@@ -755,7 +941,8 @@ export class Renderer {
 
     this.drawFieldNet();
     this.drawPaddles(state, t);
-    this.drawBall(state, t);
+    // На обратном отсчёте мяч прячем — он стоит в центре под цифрой.
+    if (!opts.hideBall) this.drawBall(state, t);
 
     ctx.restore();
   }
@@ -765,40 +952,19 @@ export class Renderer {
     const left = state.paddles[0];
     const right = state.paddles[1];
 
-    // Левая ракетка - гусеница PNG
-    if (caterpillarImg.complete && caterpillarImg.naturalWidth > 0) {
-      const imgAspect = caterpillarImg.naturalWidth / caterpillarImg.naturalHeight;
-      const drawH = left.h;
-      const drawW = drawH * imgAspect;
-      ctx.drawImage(
-        caterpillarImg,
-        left.x + left.w / 2 - drawW / 2,
-        left.y,
-        drawW,
-        drawH
-      );
-    } else {
-      // Фолбек - белый прямоугольник
-      ctx.fillStyle = "#ffffff";
-      ctx.fillRect(left.x, left.y, left.w, left.h);
-    }
+    const drawPaddle = (img, p) => {
+      if (!img.complete || !img.naturalWidth) return;
 
-    // Правая ракетка - колючая PNG
-    if (spikyImg.complete && spikyImg.naturalWidth > 0) {
-      const imgAspect = spikyImg.naturalWidth / spikyImg.naturalHeight;
-      const drawH = right.h;
+      const imgAspect = img.naturalWidth / img.naturalHeight;
+      const drawH = p.h;
       const drawW = drawH * imgAspect;
-      ctx.drawImage(
-        spikyImg,
-        right.x + right.w / 2 - drawW / 2,
-        right.y,
-        drawW,
-        drawH
-      );
-    } else {
-      ctx.fillStyle = "#ffffff";
-      ctx.fillRect(right.x, right.y, right.w, right.h);
-    }
+      const x = p.x + p.w / 2 - drawW / 2;
+      const y = p.y + (p.h - drawH) / 2;
+      ctx.drawImage(img, x, y, drawW, drawH);
+    };
+
+    drawPaddle(paddleLeftImg, left);
+    drawPaddle(paddleRightImg, right);
   }
 
   drawBall(state, t) {
@@ -809,27 +975,20 @@ export class Renderer {
     if (ballImg.complete && ballImg.naturalWidth > 0) {
       ctx.save();
       ctx.translate(b.x, b.y);
-      
+
       // Поворачиваем мяч в направлении движения
       if (b.vx < 0) {
         ctx.scale(-1, 1);
       }
-      
+
       const imgAspect = ballImg.naturalWidth / ballImg.naturalHeight;
       const drawW = size * imgAspect;
       const drawH = size;
-      
-      ctx.drawImage(
-        ballImg,
-        -drawW / 2,
-        -drawH / 2,
-        drawW,
-        drawH
-      );
+
+      ctx.drawImage(ballImg, -drawW / 2, -drawH / 2, drawW, drawH);
       ctx.restore();
     } else {
-      // Фолбек - белый квадрат
-      ctx.fillStyle = "#ffffff";
+      ctx.fillStyle = BRAND.colors.ink;
       ctx.fillRect(b.x - b.r, b.y - b.r, b.r * 2, b.r * 2);
     }
   }

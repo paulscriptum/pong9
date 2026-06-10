@@ -1,6 +1,5 @@
 // ===========================================================
 // ПОНГ · 8БИТ — bootstrap, game loop и конечный автомат экранов.
-// Дизайн в стиле брендбука: светлый фон, фиолетовый акцент.
 // ===========================================================
 
 import BRAND from "./brand.js";
@@ -9,7 +8,6 @@ import { makeQRCanvas } from "./blobs.js";
 import { PongGame } from "./game.js";
 import { Renderer } from "./render.js";
 import { setupControls } from "./controls.js";
-import { drawBug } from "./mascots.js";
 
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
@@ -46,12 +44,15 @@ function syncControlsLayout() {
   const layout = renderer.getLayout();
   const c = layout.controls;
   const root = document.documentElement;
-  root.style.setProperty("--control-top", `${c.y}px`);
-  root.style.setProperty("--control-left-x", `${c.leftX}px`);
-  root.style.setProperty("--control-right-x", `${c.rightX}px`);
-  root.style.setProperty("--control-gap", `${c.gap}px`);
   root.style.setProperty("--control-size", `${c.size}px`);
-  root.style.setProperty("--label-top", `${c.labelY}px`);
+  root.style.setProperty("--ctl-l-up-x", `${c.leftUp.x}px`);
+  root.style.setProperty("--ctl-l-up-y", `${c.leftUp.y}px`);
+  root.style.setProperty("--ctl-l-down-x", `${c.leftDown.x}px`);
+  root.style.setProperty("--ctl-l-down-y", `${c.leftDown.y}px`);
+  root.style.setProperty("--ctl-r-up-x", `${c.rightUp.x}px`);
+  root.style.setProperty("--ctl-r-up-y", `${c.rightUp.y}px`);
+  root.style.setProperty("--ctl-r-down-x", `${c.rightDown.x}px`);
+  root.style.setProperty("--ctl-r-down-y", `${c.rightDown.y}px`);
 }
 
 function resize() {
@@ -99,6 +100,7 @@ function goGameOver() {
   winner = game.winner;
   game.clearInput();
   qrCanvas = null;
+  document.getElementById("controls").style.display = "none";
   Sfx.win();
   setState(STATE.GAMEOVER);
 }
@@ -128,7 +130,8 @@ function hitRect(rect, x, y) {
 }
 
 function handleBottomButtonClick(x, y) {
-  if (state === STATE.ATTRACT) return false;
+  // Пилюли есть только на игровых экранах (на standby и финальном их нет).
+  if (state === STATE.ATTRACT || state === STATE.GAMEOVER) return false;
 
   const rects = renderer.getBottomButtonRects();
   if (!rects) return false;
@@ -186,9 +189,19 @@ function onUserTap() {
 }
 window.onUserTap = onUserTap;
 
+// Отладочный хук: показать финальный экран без игры (для проверки вёрстки).
+window._debugGameOver = (w = 0, s0 = 5, s1 = 3) => {
+  game.scores[0] = s0;
+  game.scores[1] = s1;
+  winner = w;
+  qrCanvas = null;
+  document.getElementById("controls").style.display = "none";
+  setState(STATE.GAMEOVER);
+};
+
 // Текстовые помощники
-function drawText(text, x, y, size, color, font = BRAND.fonts.brand) {
-  ctx.font = `500 ${size}px ${font}`;
+function drawText(text, x, y, size, color, font = BRAND.fonts.brand, weight = 500) {
+  ctx.font = `${weight} ${size}px ${font}`;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.fillStyle = color;
@@ -198,6 +211,7 @@ function drawText(text, x, y, size, color, font = BRAND.fonts.brand) {
 function update(dt) {
   renderer.updateParticles(dt);
   renderer.updateMascots(dt);
+  renderer.updatePromo(dt);
 
   switch (state) {
     case STATE.ATTRACT:
@@ -218,7 +232,7 @@ function update(dt) {
             renderer.showMascot(e.x, e.y, false);
           }
         } else if (e.type === "wall") {
-          renderer.burst(e.x, e.y, 6, [BRAND.colors.ink]);
+          renderer.burst(e.x, e.y, 6, BRAND.palette);
         } else if (e.type === "score") {
           scored = true;
           // Показываем маскота при голе (всегда)
@@ -264,12 +278,17 @@ function draw() {
   }
 }
 
+const STANDBY = {
+  bg: "#6B5CE7",
+  ink: "#ffffff",
+};
+
 function drawAttract() {
   const min = Math.min(W, H);
 
-  // Фиолетовый фон на ВЕСЬ экран (fullscreen standby)
+  // Фиолетовый фон на ВЕСЬ экран (fullscreen standby) — без изменений.
   ctx.save();
-  ctx.fillStyle = BRAND.colors.accent;
+  ctx.fillStyle = STANDBY.bg;
   ctx.fillRect(0, 0, W, H);
 
   // Текст "НАЖМИТЕ, ЧТОБЫ ИГРАТЬ" по центру (пульсирующий)
@@ -277,7 +296,7 @@ function drawAttract() {
   ctx.font = `700 ${min * 0.05}px ${BRAND.fonts.brand}`;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillStyle = BRAND.colors.ink;
+  ctx.fillStyle = STANDBY.ink;
   ctx.fillText("НАЖМИТЕ, ЧТОБЫ ИГРАТЬ", W / 2, H * 0.4);
   ctx.globalAlpha = 1;
 
@@ -314,7 +333,8 @@ function drawAttract() {
 }
 
 function drawCountdown() {
-  renderer.drawPlayfield(game.getState(), elapsed);
+  // Прячем мяч — он стоит в центре и наслаивался бы на цифру отсчёта.
+  renderer.drawPlayfield(game.getState(), elapsed, { hideBall: true });
   renderer.drawScores(game.scores);
 
   const min = Math.min(W, H);
@@ -352,80 +372,79 @@ function drawPoint() {
   ctx.globalAlpha = 1;
 }
 
+// Финальный экран по макету: чёрный фон, лого с подписью журнала
+// сверху слева, белая «клякса» по центру, контент чёрным внутри неё.
+// Появление кляксы: быстрый скейл с лёгким овершутом.
+const BURST_APPEAR = 0.45;
+function easeOutBack(t) {
+  const c1 = 1.70158;
+  const c3 = c1 + 1;
+  return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
+}
+
 function drawGameOver() {
   const min = Math.min(W, H);
-  renderer.drawChrome(elapsed);
-  const field = renderer.getFieldRect();
+  const appear = Math.min(1, stateTime / BURST_APPEAR);
+  const scale = easeOutBack(appear);
 
   ctx.save();
+  const burst = renderer.drawFinalChrome(scale);
+  const cx = burst.cx;
+  const cy = burst.cy;
 
-  // Черный фон поля
-  ctx.fillStyle = BRAND.colors.field;
-  ctx.beginPath();
-  ctx.roundRect(field.x, field.y, field.w, field.h, field.r);
-  ctx.fill();
+  // Контент масштабируется вместе с кляксой вокруг её центра.
+  ctx.translate(cx, cy);
+  ctx.scale(Math.max(0.001, scale), Math.max(0.001, scale));
+  ctx.translate(-cx, -cy);
 
-  // Фиолетовая рамка
-  ctx.strokeStyle = BRAND.colors.accent;
-  ctx.lineWidth = 3;
-  ctx.stroke();
-
-  // Победный текст — ровный вертикальный ритм
-  drawText("ПОБЕДА!", W / 2, field.y + field.h * 0.14, min * 0.07, BRAND.colors.ink, BRAND.fonts.brand);
+  drawText("ПОБЕДА!", cx, cy - burst.h * 0.22, min * 0.065, BRAND.colors.ink, BRAND.fonts.brand);
   drawText(
     `Игрок ${Math.max(0, winner) + 1}`,
-    W / 2,
-    field.y + field.h * 0.26,
-    min * 0.035,
+    cx,
+    cy - burst.h * 0.12,
+    min * 0.032,
     BRAND.colors.ink,
     BRAND.fonts.ui
   );
   drawText(
     `${game.scores[0]} : ${game.scores[1]}`,
-    W / 2,
-    field.y + field.h * 0.37,
+    cx,
+    cy - burst.h * 0.01,
     min * 0.04,
-    BRAND.colors.ink
+    BRAND.colors.ink,
+    BRAND.fonts.brand
   );
-
-  // CTA: «Читайте журнал в телеграме» + жучок в конце.
-  // Автоподбор размера, чтобы строка с жучком всегда помещалась в поле.
-  const ctaY = field.y + field.h * 0.46;
-  const ctaText = "Читайте журнал в телеграме";
-  const ctaMaxW = field.w * 0.86;
-  let ctaSize = min * 0.028;
-  let textW, bugSize, bugGap, ctaTotalW;
-  for (let guard = 0; guard < 12; guard++) {
-    ctx.font = `500 ${ctaSize}px ${BRAND.fonts.brand}`;
-    textW = ctx.measureText(ctaText).width;
-    bugSize = ctaSize * 0.95;
-    bugGap = bugSize * 0.6;
-    ctaTotalW = textW + bugGap + bugSize;
-    if (ctaTotalW <= ctaMaxW) break;
-    ctaSize *= 0.92;
-  }
-
-  ctx.textAlign = "left";
-  ctx.textBaseline = "middle";
-  ctx.fillStyle = BRAND.colors.ink;
-
-  const ctaX = W / 2 - ctaTotalW / 2;
-  ctx.fillText(ctaText, ctaX, ctaY);
-  drawBug(ctx, ctaX + textW + bugGap + bugSize * 0.5, ctaY, bugSize, BRAND.colors.ink);
-
-  // QR код — центрирован в нижней половине поля, с подписью под ним
-  const qrSize = min * 0.2;
-  const qrCenterY = field.y + field.h * 0.71;
-  drawQR(W / 2, qrCenterY, qrSize);
 
   drawText(
-    BRAND.ctaSub,
-    W / 2,
-    qrCenterY + qrSize / 2 + min * 0.028,
-    min * 0.02,
+    "ЧИТАЙТЕ ЖУРНАЛ В ТЕЛЕГРАМЕ",
+    cx,
+    cy + burst.h * 0.105,
+    min * 0.024,
     BRAND.colors.ink,
-    BRAND.fonts.ui
+    BRAND.fonts.brand,
+    700
   );
+
+  // QR — в нижней части «кляксы». Белая подложка под QR и подписью,
+  // чтобы блок не проваливался в зубцы «кляксы».
+  const qrSize = min * 0.14;
+  const qrCenterY = cy + burst.h * 0.26;
+  const subSize = min * 0.02;
+  const subY = qrCenterY + qrSize / 2 + min * 0.02;
+
+  ctx.save();
+  ctx.font = `700 ${subSize}px ${BRAND.fonts.brand}`;
+  const cardW = Math.max(qrSize, ctx.measureText(BRAND.ctaSub).width) + min * 0.04;
+  const cardTop = qrCenterY - qrSize / 2 - min * 0.015;
+  const cardBottom = subY + subSize * 0.8 + min * 0.012;
+  ctx.fillStyle = BRAND.colors.field;
+  ctx.beginPath();
+  ctx.roundRect(cx - cardW / 2, cardTop, cardW, cardBottom - cardTop, min * 0.02);
+  ctx.fill();
+  ctx.restore();
+
+  drawQR(cx, qrCenterY, qrSize);
+  drawText(BRAND.ctaSub, cx, subY, subSize, BRAND.colors.ink, BRAND.fonts.brand, 700);
 
   ctx.restore();
 }

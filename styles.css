@@ -1,6 +1,5 @@
 /* ===========================================================
-   ПОНГ · 8БИТ — стили в стиле брендбука.
-   Светлый фон, фиолетовые акценты, черное игровое поле.
+   ПОНГ · 8БИТ — редизайн: чёрный фон, белое поле, монохром.
    =========================================================== */
 
 @font-face {
@@ -52,22 +51,22 @@
 }
 
 :root {
-  --bg: #E8E4E0;
-  --field: #0c0c0c;
-  --text: #0c0c0c;
-  --ink: #ffffff;
-  --accent: #6B5CE7;
-  --accent-dark: #5A4BD6;
-  --dim: #999999;
+  --bg: #000000;
+  --field: #ffffff;
+  --text: #ffffff;
+  --ink: #0c0c0c;
+  --accent: #873CF5;
+  --accent-dark: #6B2FD0;
+  --dim: #888888;
   --font-display: "CoFo Driffter", "Comic Sans MS", cursive;
   --font-brand: "CoFo Driffter", "Comic Sans MS", cursive;
   --font-ui: "CoFo Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  --control-top: 50%;
-  --control-left-x: 2vw;
-  --control-right-x: 2vw;
-  --control-gap: 1.5vmin;
-  --control-size: clamp(52px, 5.5vmin, 90px);
-  --label-top: 27%;
+  --control-size: clamp(44px, 7vmin, 90px);
+  /* Центры кнопок управления — задаются из JS по layout'у канваса */
+  --ctl-l-up-x: 8vw;  --ctl-l-up-y: 30vh;
+  --ctl-l-down-x: 6vw; --ctl-l-down-y: 70vh;
+  --ctl-r-up-x: 92vw; --ctl-r-up-y: 30vh;
+  --ctl-r-down-x: 94vw; --ctl-r-down-y: 70vh;
 }
 
 * {
@@ -109,7 +108,7 @@ body {
   touch-action: none;
 }
 
-/* ---- Тач-управление ---- */
+/* ---- Тач-управление (квадраты со стрелками-шевронами, как в макете) ---- */
 .controls {
   position: absolute;
   inset: 0;
@@ -117,77 +116,55 @@ body {
   z-index: 10;
 }
 
-.controls-side {
-  position: absolute;
-  top: var(--control-top);
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: var(--control-gap);
-  padding: 0;
-  transform: translateY(-50%);
-}
-
-.controls-left {
-  left: var(--control-left-x);
-}
-
-.controls-right {
-  right: var(--control-right-x);
-  transform: translateY(-50%) rotate(180deg);
-}
-
-/* Кнопки управления - используем PNG из архива, повернутые на 90° */
 .ctrl-btn {
   pointer-events: auto;
+  position: absolute;
   width: var(--control-size);
   height: var(--control-size);
-  border-radius: 12px;
+  transform: translate(-50%, -50%);
   border: none;
-  background: url('/images/button_left.png') center/contain no-repeat;
+  border-radius: 0;
+  padding: 0;
+  background-color: transparent;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 100% 100%;
   color: transparent;
   font-size: 0;
   cursor: pointer;
   touch-action: none;
-  transition: transform 0.06s ease, opacity 0.1s ease;
-  position: relative;
-  transform: rotate(90deg); /* Поворачиваем стрелку вверх */
+  transition: filter 0.06s ease, opacity 0.1s ease;
 }
 
-/* Кнопка вниз - поворот на -90° */
+/* Кнопки: белые в покое, фиолетовые при нажатии (одинаковые для обоих игроков) */
+.ctrl-btn[data-dir="up"] {
+  background-image: url("/images/ui/btn_white_up.png");
+}
+
 .ctrl-btn[data-dir="down"] {
-  transform: rotate(-90deg);
+  background-image: url("/images/ui/btn_white_down.png");
 }
 
-/* Правые кнопки используют button_right.png */
-.controls-right .ctrl-btn {
-  background-image: url('/images/button_right.png');
-  transform: rotate(-90deg); /* Поворачиваем стрелку вверх */
+.ctrl-btn.is-active[data-dir="up"] {
+  background-image: url("/images/ui/btn_purple_up.png");
 }
 
-.controls-right .ctrl-btn[data-dir="up"] {
-  transform: rotate(90deg); /* Вниз для правого игрока */
+.ctrl-btn.is-active[data-dir="down"] {
+  background-image: url("/images/ui/btn_purple_down.png");
 }
 
-.ctrl-btn.is-active {
-  filter: brightness(0.9);
-  opacity: 0.85;
-}
+/* Позиции кнопок (центры из layout'а канваса) */
+.ctrl-btn[data-player="0"][data-dir="up"]   { left: var(--ctl-l-up-x);   top: var(--ctl-l-up-y); }
+.ctrl-btn[data-player="0"][data-dir="down"] { left: var(--ctl-l-down-x); top: var(--ctl-l-down-y); }
+.ctrl-btn[data-player="1"][data-dir="up"]   { left: var(--ctl-r-up-x);   top: var(--ctl-r-up-y); }
+.ctrl-btn[data-player="1"][data-dir="down"] { left: var(--ctl-r-down-x); top: var(--ctl-r-down-y); }
 
-/* Убираем outline на фокусе */
 .ctrl-btn:focus {
   outline: none;
 }
 
-/* Медиа-запросы для адаптивности */
 @media (max-width: 600px) {
   :root {
-    --control-size: clamp(44px, 10vw, 70px);
-  }
-}
-
-@media (orientation: portrait) {
-  :root {
-    --control-top: 50%;
+    --control-size: clamp(40px, 10vw, 70px);
   }
 }
