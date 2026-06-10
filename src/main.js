@@ -281,31 +281,31 @@ function drawAttract() {
   ctx.fillText("НАЖМИТЕ, ЧТОБЫ ИГРАТЬ", W / 2, H * 0.4);
   ctx.globalAlpha = 1;
 
-  // Анимированная PNG гусеница внизу экрана — ползёт справа налево
-  // с подскоками, покачиванием и пульсирующей скоростью.
+  // Анимированная PNG гусеница внизу экрана — плавно ползёт справа налево.
   if (standbyCaterpillarImg.complete && standbyCaterpillarImg.naturalWidth > 0) {
     const catH = min * 0.08;
     const aspectRatio = standbyCaterpillarImg.naturalWidth / standbyCaterpillarImg.naturalHeight;
     const catW = catH * aspectRatio;
 
-    const crawl = elapsed * 3.2;
-    const baseSpeed = 95;
-    // Неравномерная скорость без деформации тела.
-    const distance = baseSpeed * (elapsed - (0.55 / 3.2) * Math.cos(crawl));
-    // Чистый промежуток в одну длину тела — на экране всегда одна гусеница.
+    const crawl = elapsed * 2.4;
+    const speed = 72; // px/s — ровное движение без рывков
     const totalPath = W + catW * 3;
-    const rawX = ((distance % totalPath) + totalPath) % totalPath;
+    const rawX = ((elapsed * speed) % totalPath + totalPath) % totalPath;
     const catX = W + catW - rawX;
     const baseY = H * 0.72;
 
-    const hop = -Math.abs(Math.sin(crawl)) * catH * 0.3;
-    const wobble = Math.sin(crawl * 0.5) * 0.09;
+    // Мягкая волна по полу, без подскоков и поворотов всего спрайта.
+    const waveY = Math.sin(crawl) * catH * 0.035;
+    // Лёгкое «дыхание» тела inchworm — якорь внизу, не прыжок палкой.
+    const breathe = Math.max(0, Math.sin(crawl));
+    const scaleX = 1 - 0.07 * breathe;
+    const scaleY = 1 + 0.05 * breathe;
 
     ctx.save();
     const cx = catX - catW / 2;
     const cy = baseY + catH;
-    ctx.translate(cx, cy + hop);
-    ctx.rotate(wobble);
+    ctx.translate(cx, cy + waveY);
+    ctx.scale(scaleX, scaleY);
     ctx.drawImage(standbyCaterpillarImg, -catW / 2, -catH, catW, catH);
     ctx.restore();
   }
