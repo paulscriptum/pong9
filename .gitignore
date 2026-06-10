@@ -4,3 +4,4 @@ assets/**/.DS_Store
 assets/fonts-source/
 node_modules/
 .vercel/
+.vercel
