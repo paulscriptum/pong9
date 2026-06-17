@@ -34,7 +34,7 @@ export const BRAND = {
   ctaSub: "Сканируй и учись!",
   url: "https://t.me/+aOoca-2dCaRiOTFi",
 
-  gameOverQrHeadline: "ЧИТАЙТЕ ЖУРНАЛ В ТЕЛЕГРАМЕ",
+  gameOverQrHeadline: "ЧИТАЙ ЖУРНАЛ В ТЕЛЕГРАМЕ",
 
   promoRotateSeconds: 4,
   standbyPhrase: "Привет! это журнал 8БИТ.\nСыграем?",
