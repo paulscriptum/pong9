@@ -218,8 +218,7 @@ export class PongGame {
     rel = Math.max(-1, Math.min(1, rel));
     const angle = rel * c.maxBounceAngle;
 
-    const maxSpeed = c.maxBallSpeedRatio * this.width;
-    b.speed = Math.min(b.speed * c.ballSpeedup, maxSpeed);
+    b.speed = b.speed * c.ballSpeedup;
     b.vx = dirSign * b.speed * Math.cos(angle);
     b.vy = b.speed * Math.sin(angle);
 

@@ -108,6 +108,16 @@ const PROMO_BUBBLE = {
   textPadY: 3,
 };
 
+// Бабл на экране сна: хвост снизу-слева, крепится к голове гусеницы.
+const STANDBY_BUBBLE = {
+  widthScale: 1.14,
+  tailFromCenterX: 0.48,
+  tailFromCenterY: 0.68,
+  headOffsetX: 0.36,
+  headOffsetY: 0.28,
+  textShiftXRatio: -0.68,
+};
+
 const FIGMA = {
   w: 716,
   h: 452,
@@ -768,31 +778,9 @@ export class Renderer {
     ctx.fill();
   }
 
-  drawCenterPromo(field) {
+  _drawPromoBubbleLayout(layout, bubbleCx, bubbleCy, { alpha = 1, scale = 1, textShiftX = 0 } = {}) {
     const ctx = this.ctx;
-    const cx = field.x + field.w / 2;
-    const fieldBottom = field.y + field.h;
-
-    // Маскот по центру под полем.
-    const mascotH = this.h * 0.111;
-    const mascotTop = fieldBottom + this.h * 0.033;
-    if (centerMascotImg.complete && centerMascotImg.naturalWidth > 0) {
-      const aspect = centerMascotImg.naturalWidth / centerMascotImg.naturalHeight;
-      const w = mascotH * aspect;
-      ctx.drawImage(centerMascotImg, cx - w / 2, mascotTop, w, mascotH);
-    }
-
-    // Спич-баббл правее маскота; размер подстраивается под текст.
-    const layout = this._layoutPromoBubble(this.promoPhrase);
-    const { bubbleW, bubbleH, fit, baseH, textX, textOy } = layout;
-    const bubbleX = cx + this.w * 0.024;
-    const bubbleY = fieldBottom + this.h * 0.013 - (bubbleH - baseH) * 0.65;
-
-    const animT = 1 - Math.pow(1 - this.promoAnim, 3);
-    const scale = 0.9 + 0.1 * animT;
-    const alpha = 0.55 + 0.45 * animT;
-    const bubbleCx = bubbleX + bubbleW / 2;
-    const bubbleCy = bubbleY + bubbleH / 2;
+    const { bubbleW, bubbleH, fit, textX, textOy } = layout;
 
     ctx.save();
     ctx.translate(bubbleCx, bubbleCy);
@@ -811,10 +799,56 @@ export class Renderer {
     ctx.fillStyle = BRAND.colors.pillText;
     let ty = textOy - fit.blockH / 2 + fit.lineH / 2;
     for (const line of fit.lines) {
-      ctx.fillText(line, textX, ty);
+      ctx.fillText(line, textX + textShiftX, ty);
       ty += fit.lineH;
     }
     ctx.restore();
+  }
+
+  drawStandbyBubble(phrase, headX, headY) {
+    const layout = this._layoutPromoBubble(phrase);
+    const bubbleW = layout.bubbleW * STANDBY_BUBBLE.widthScale;
+    const bubbleH = layout.bubbleH;
+    const bubbleCx = headX + bubbleW * STANDBY_BUBBLE.tailFromCenterX;
+    const bubbleCy = headY - bubbleH * STANDBY_BUBBLE.tailFromCenterY;
+    this._drawPromoBubbleLayout({ ...layout, bubbleW, bubbleH }, bubbleCx, bubbleCy, {
+      textShiftX: layout.fit.size * STANDBY_BUBBLE.textShiftXRatio,
+    });
+  }
+
+  drawStandbyBubbleForCaterpillar(phrase, { pivotX, pivotY, catW, catH, scaleX, scaleY }) {
+    const headX = pivotX + (-catW / 2 + catH * STANDBY_BUBBLE.headOffsetX) * scaleX;
+    const headY = pivotY + (-catH + catH * STANDBY_BUBBLE.headOffsetY) * scaleY;
+    this.drawStandbyBubble(phrase, headX, headY);
+  }
+
+  drawCenterPromo(field) {
+    const ctx = this.ctx;
+    const cx = field.x + field.w / 2;
+    const fieldBottom = field.y + field.h;
+
+    // Маскот по центру под полем.
+    const mascotH = this.h * 0.111;
+    const mascotTop = fieldBottom + this.h * 0.033;
+    if (centerMascotImg.complete && centerMascotImg.naturalWidth > 0) {
+      const aspect = centerMascotImg.naturalWidth / centerMascotImg.naturalHeight;
+      const w = mascotH * aspect;
+      ctx.drawImage(centerMascotImg, cx - w / 2, mascotTop, w, mascotH);
+    }
+
+    // Спич-баббл правее маскота; размер подстраивается под текст.
+    const layout = this._layoutPromoBubble(this.promoPhrase);
+    const { bubbleW, bubbleH, baseH } = layout;
+    const bubbleX = cx + this.w * 0.024;
+    const bubbleY = fieldBottom + this.h * 0.013 - (bubbleH - baseH) * 0.65;
+
+    const animT = 1 - Math.pow(1 - this.promoAnim, 3);
+    const scale = 0.9 + 0.1 * animT;
+    const alpha = 0.55 + 0.45 * animT;
+    const bubbleCx = bubbleX + bubbleW / 2;
+    const bubbleCy = bubbleY + bubbleH / 2;
+
+    this._drawPromoBubbleLayout(layout, bubbleCx, bubbleCy, { alpha, scale });
   }
 
   drawBottomButtons(bottomButtons, field) {
@@ -871,16 +905,43 @@ export class Renderer {
     ctx.restore();
   }
 
-  // База финального экрана: чёрный фон, лого, белая «клякса» (bg_win).
-  // scale — для анимации появления (масштаб вокруг центра кляксы).
-  // Возвращает рект кляксы в полном (НЕмасштабированном) размере.
-  drawFinalChrome(scale = 1) {
+  _getFinalQrBurstLayout() {
+    const bgAspect = bgWinImg.naturalWidth / bgWinImg.naturalHeight || 1024 / 599;
+    let bw = this.w * 0.36;
+    let bh = bw / bgAspect;
+    const maxBh = this.h * 0.34;
+    if (bh > maxBh) {
+      bh = maxBh;
+      bw = bh * bgAspect;
+    }
+    const cx = this.w * 0.5;
+    const cy = this.h * 0.62;
+    return { x: cx - bw / 2, y: cy - bh / 2, w: bw, h: bh, cx, cy };
+  }
+
+  drawFinalQrBlob(scale = 1) {
     const ctx = this.ctx;
-    const min = Math.min(this.w, this.h) || 1;
+    const burst = this._getFinalQrBurstLayout();
+    const sw = burst.w * scale;
+    const sh = burst.h * scale;
 
-    ctx.fillStyle = BRAND.colors.bg;
-    ctx.fillRect(0, 0, this.w, this.h);
+    if (scale > 0.001) {
+      if (bgWinImg.complete && bgWinImg.naturalWidth > 0) {
+        ctx.drawImage(bgWinImg, burst.cx - sw / 2, burst.cy - sh / 2, sw, sh);
+      } else if (starburstImg.complete && starburstImg.naturalWidth > 0) {
+        ctx.drawImage(starburstImg, burst.cx - sw / 2, burst.cy - sh / 2, sw, sh);
+      } else {
+        ctx.fillStyle = BRAND.colors.pill;
+        ctx.beginPath();
+        ctx.ellipse(burst.cx, burst.cy, sw / 2, sh / 2, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
 
+    return { ...burst, w: sw, h: sh };
+  }
+
+  _getFinalBurstLayout() {
     const bgAspect = bgWinImg.naturalWidth / bgWinImg.naturalHeight || 1024 / 599;
     let bw = this.w * 0.716 * WIN_BG_SCALE;
     let bh = bw / bgAspect;
@@ -891,26 +952,48 @@ export class Renderer {
     }
     const cx = this.w * 0.487;
     const cy = this.h * 0.484;
-    const sw = bw * scale;
-    const sh = bh * scale;
+    return { x: cx - bw / 2, y: cy - bh / 2, w: bw, h: bh, cx, cy };
+  }
+
+  drawFinalBase() {
+    const ctx = this.ctx;
+    ctx.fillStyle = BRAND.colors.bg;
+    ctx.fillRect(0, 0, this.w, this.h);
+  }
+
+  drawFinalLogo() {
+    const min = Math.min(this.w, this.h) || 1;
+    this.drawBrandLogo(this.w * 0.039, this.h * 0.055, min);
+  }
+
+  drawFinalBlob(scale = 1) {
+    const ctx = this.ctx;
+    const burst = this._getFinalBurstLayout();
+    const sw = burst.w * scale;
+    const sh = burst.h * scale;
 
     if (scale > 0.001) {
       if (bgWinImg.complete && bgWinImg.naturalWidth > 0) {
-        ctx.drawImage(bgWinImg, cx - sw / 2, cy - sh / 2, sw, sh);
+        ctx.drawImage(bgWinImg, burst.cx - sw / 2, burst.cy - sh / 2, sw, sh);
       } else if (starburstImg.complete && starburstImg.naturalWidth > 0) {
-        ctx.drawImage(starburstImg, cx - sw / 2, cy - sh / 2, sw, sh);
+        ctx.drawImage(starburstImg, burst.cx - sw / 2, burst.cy - sh / 2, sw, sh);
       } else {
         ctx.fillStyle = BRAND.colors.pill;
         ctx.beginPath();
-        ctx.ellipse(cx, cy, sw / 2, sh / 2, 0, 0, Math.PI * 2);
+        ctx.ellipse(burst.cx, burst.cy, sw / 2, sh / 2, 0, 0, Math.PI * 2);
         ctx.fill();
       }
     }
 
-    // Лого и подпись — поверх кляксы.
-    this.drawBrandLogo(this.w * 0.039, this.h * 0.055, min);
+    return burst;
+  }
 
-    return { x: cx - bw / 2, y: cy - bh / 2, w: bw, h: bh, cx, cy };
+  // База финального экрана: чёрный фон, лого, белая «клякса» (bg_win).
+  drawFinalChrome(scale = 1) {
+    this.drawFinalBase();
+    const burst = this.drawFinalBlob(scale);
+    this.drawFinalLogo();
+    return burst;
   }
 
   drawFieldNet() {

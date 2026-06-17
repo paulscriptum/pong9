@@ -32,15 +32,20 @@ export const BRAND = {
   cta: "ИГРАЙ",
   ctaLine2: "ПО БИТНОМУ",
   ctaSub: "Сканируй и учись!",
-  url: "https://t.me/journal_yandex_education",
+  url: "https://t.me/+aOoca-2dCaRiOTFi",
+
+  gameOverQrHeadline: "ЧИТАЙТЕ ЖУРНАЛ В ТЕЛЕГРАМЕ",
 
   promoRotateSeconds: 4,
+  standbyPhrase: "Привет! это журнал 8БИТ.\nСыграем?",
   promoPhrases: [
     "Физический мир\nначинается\nс движения",
     "Улови траекторию",
     "Управляй движением",
     "Освой физику движения",
     "От пикселей\nк роботам",
+    "Понг - первая компьютерная игра",
+    "Делай виртуальное реальным!",
   ],
 
   layout: {
@@ -68,7 +73,6 @@ export const BRAND = {
     ballRadiusPx: 18,
     ballStartSpeedRatio: 0.38,
     ballSpeedup: 1.04,
-    maxBallSpeedRatio: 1.0,
     maxBounceAngle: Math.PI / 3,
     paddleSpeedRatio: 1.2,
     countdownSeconds: 3,

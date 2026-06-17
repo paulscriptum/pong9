@@ -15,10 +15,92 @@ const ctx = canvas.getContext("2d");
 const game = new PongGame(BRAND.game);
 const renderer = new Renderer(ctx);
 
-// PNG гусеницы для standby экрана
-const standbyCaterpillarImg = new Image();
-standbyCaterpillarImg.crossOrigin = "anonymous";
-standbyCaterpillarImg.src = "/images/standby_caterpillar.png";
+const standbyLayer = document.getElementById("standby-layer");
+const standbyWormVideo = document.getElementById("standby-worm");
+
+let standbyWormReady = false;
+
+function onStandbyWormReady() {
+  if (!standbyWormVideo || standbyWormVideo.videoWidth <= 0) return;
+  standbyWormReady = true;
+  syncStandbyWormPlayback();
+}
+
+if (standbyWormVideo) {
+  standbyWormVideo.addEventListener("loadedmetadata", onStandbyWormReady);
+  standbyWormVideo.addEventListener("canplay", onStandbyWormReady);
+  standbyWormVideo.addEventListener("error", () => {
+    standbyWormReady = false;
+  });
+}
+
+function syncStandbyLayer() {
+  if (standbyLayer) standbyLayer.hidden = state !== STATE.ATTRACT;
+}
+
+function syncStandbyWormPlayback() {
+  if (!standbyWormVideo) return;
+  if (state !== STATE.ATTRACT || !standbyWormReady) {
+    if (!standbyWormVideo.paused) standbyWormVideo.pause();
+    return;
+  }
+  if (standbyWormVideo.paused) {
+    standbyWormVideo.play().catch(() => {});
+  }
+}
+
+// Траектория speech bubble — подгоняется под голову гусеницы в fullscreen-видео.
+const STANDBY_BUBBLE_TRACK = {
+  heightScale: 0.08,
+  baseY: 0.72,
+  crawlSpeed: 5.508,
+  moveSpeed: 165.24,
+  waveAmp: 0.035,
+  startDelay: 2,
+  endDelay: 3.63,
+  offsetX: 0,
+  offsetY: 0,
+};
+window._standbyBubbleTrack = STANDBY_BUBBLE_TRACK;
+
+function getStandbyBubbleAnchor() {
+  const min = Math.min(W, H);
+  const catH = min * STANDBY_BUBBLE_TRACK.heightScale;
+  const aspectRatio =
+    standbyWormVideo?.videoWidth > 0
+      ? standbyWormVideo.videoWidth / standbyWormVideo.videoHeight
+      : 16 / 9;
+  const catW = catH * aspectRatio;
+
+  const speed = STANDBY_BUBBLE_TRACK.moveSpeed;
+  const totalPath = W + catW * 3;
+  const travelDuration = totalPath / speed;
+  const { startDelay, endDelay } = STANDBY_BUBBLE_TRACK;
+
+  let rawX = 0;
+  let crawlT = 0;
+  const t = elapsed - startDelay;
+  if (t > 0) {
+    const loopDuration = travelDuration + endDelay;
+    const phase = t % loopDuration;
+    if (phase < travelDuration) {
+      rawX = phase * speed;
+      crawlT = phase;
+    } else {
+      rawX = totalPath;
+      crawlT = travelDuration;
+    }
+  }
+
+  const crawl = crawlT * STANDBY_BUBBLE_TRACK.crawlSpeed;
+  const catX = W + catW - rawX;
+  const baseY = H * STANDBY_BUBBLE_TRACK.baseY;
+  const waveY = Math.sin(crawl) * catH * STANDBY_BUBBLE_TRACK.waveAmp;
+  const cx = catX - catW / 2 + STANDBY_BUBBLE_TRACK.offsetX;
+  const cy = baseY + catH + waveY + STANDBY_BUBBLE_TRACK.offsetY;
+
+  return { pivotX: cx, pivotY: cy, catW, catH, scaleX: 1, scaleY: 1 };
+}
 
 let W = 0;
 let H = 0;
@@ -74,6 +156,11 @@ function setState(s) {
   state = s;
   stateTime = 0;
   window._debugState = s;
+  syncStandbyLayer();
+  if (s === STATE.ATTRACT && standbyWormVideo) {
+    standbyWormVideo.currentTime = 0;
+  }
+  syncStandbyWormPlayback();
 }
 
 function startMatch() {
@@ -286,12 +373,12 @@ const STANDBY = {
 function drawAttract() {
   const min = Math.min(W, H);
 
-  // Фиолетовый фон на ВЕСЬ экран (fullscreen standby) — без изменений.
-  ctx.save();
-  ctx.fillStyle = STANDBY.bg;
-  ctx.fillRect(0, 0, W, H);
+  ctx.clearRect(0, 0, W, H);
+  syncStandbyLayer();
+  syncStandbyWormPlayback();
 
   // Текст "НАЖМИТЕ, ЧТОБЫ ИГРАТЬ" по центру (пульсирующий)
+  ctx.save();
   ctx.globalAlpha = 0.85 + 0.15 * Math.sin(elapsed * 2.5);
   ctx.font = `700 ${min * 0.05}px ${BRAND.fonts.brand}`;
   ctx.textAlign = "center";
@@ -300,33 +387,8 @@ function drawAttract() {
   ctx.fillText("НАЖМИТЕ, ЧТОБЫ ИГРАТЬ", W / 2, H * 0.4);
   ctx.globalAlpha = 1;
 
-  // Анимированная PNG гусеница внизу экрана — плавно ползёт справа налево.
-  if (standbyCaterpillarImg.complete && standbyCaterpillarImg.naturalWidth > 0) {
-    const catH = min * 0.08;
-    const aspectRatio = standbyCaterpillarImg.naturalWidth / standbyCaterpillarImg.naturalHeight;
-    const catW = catH * aspectRatio;
-
-    const crawl = elapsed * 2.4;
-    const speed = 72; // px/s — ровное движение без рывков
-    const totalPath = W + catW * 3;
-    const rawX = ((elapsed * speed) % totalPath + totalPath) % totalPath;
-    const catX = W + catW - rawX;
-    const baseY = H * 0.72;
-
-    // Мягкая волна по полу, без подскоков и поворотов всего спрайта.
-    const waveY = Math.sin(crawl) * catH * 0.035;
-    // Лёгкое «дыхание» тела inchworm — якорь внизу, не прыжок палкой.
-    const breathe = Math.max(0, Math.sin(crawl));
-    const scaleX = 1 - 0.07 * breathe;
-    const scaleY = 1 + 0.05 * breathe;
-
-    ctx.save();
-    const cx = catX - catW / 2;
-    const cy = baseY + catH;
-    ctx.translate(cx, cy + waveY);
-    ctx.scale(scaleX, scaleY);
-    ctx.drawImage(standbyCaterpillarImg, -catW / 2, -catH, catW, catH);
-    ctx.restore();
+  if (standbyWormReady) {
+    renderer.drawStandbyBubbleForCaterpillar(BRAND.standbyPhrase, getStandbyBubbleAnchor());
   }
 
   ctx.restore();
@@ -372,9 +434,7 @@ function drawPoint() {
   ctx.globalAlpha = 1;
 }
 
-// Финальный экран по макету: чёрный фон, лого с подписью журнала
-// сверху слева, белая «клякса» по центру, контент чёрным внутри неё.
-// Появление кляксы: быстрый скейл с лёгким овершутом.
+// Финальный экран: победа белым на чёрном, QR — в отдельной «кляксе».
 const BURST_APPEAR = 0.45;
 function easeOutBack(t) {
   const c1 = 1.70158;
@@ -382,69 +442,92 @@ function easeOutBack(t) {
   return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
 }
 
+function drawVictoryText(cx, cy, min, appear = 1) {
+  const playerN = Math.max(0, winner) + 1;
+  const victorySize = min * 0.052;
+  const playerSize = min * 0.026;
+  const scoreSize = min * 0.04;
+  const gap = min * 0.016;
+  const blockH = victorySize + playerSize + scoreSize + gap * 2;
+
+  ctx.save();
+  const scale = easeOutBack(Math.min(1, appear));
+  ctx.translate(cx, cy);
+  ctx.scale(scale, scale);
+  ctx.translate(-cx, -cy);
+
+  let y = cy - blockH / 2;
+  y += victorySize / 2;
+  drawText("ПОБЕДА!", cx, y, victorySize, BRAND.colors.text, BRAND.fonts.brand, 700);
+  y += victorySize / 2 + gap + playerSize / 2;
+  drawText(`Игрок ${playerN}`, cx, y, playerSize, BRAND.colors.text, BRAND.fonts.ui, 400);
+  y += playerSize / 2 + gap + scoreSize / 2;
+  drawText(`${game.scores[0]} - ${game.scores[1]}`, cx, y, scoreSize, BRAND.colors.text, BRAND.fonts.brand, 700);
+  ctx.restore();
+}
+
+function drawGameOverQrContent(burst, min) {
+  const headlineSize = min * 0.014;
+  const maxW = burst.w * 0.78;
+  const lines = wrapTextLines(BRAND.gameOverQrHeadline, headlineSize, BRAND.fonts.ui, maxW, 700);
+  const lineH = headlineSize * 1.2;
+  const headlineBlockH = lines.length * lineH;
+  const qrSize = min * 0.1;
+  const subSize = min * 0.017;
+  const contentH = headlineBlockH + qrSize + subSize + min * 0.022;
+  let y = burst.cy - contentH / 2;
+
+  for (const line of lines) {
+    drawText(line, burst.cx, y + lineH / 2, headlineSize, BRAND.colors.ink, BRAND.fonts.ui, 700);
+    y += lineH;
+  }
+  y += min * 0.012;
+  drawQR(burst.cx, y + qrSize / 2, qrSize);
+  y += qrSize + min * 0.01;
+  drawText(BRAND.ctaSub, burst.cx, y + subSize / 2, subSize, BRAND.colors.ink, BRAND.fonts.brand, 700);
+}
+
+function drawTextBlock(lines, cx, cy, size, font, weight = 500, lineHeight = 1.3) {
+  const lh = size * lineHeight;
+  const totalH = lines.length * lh;
+  let y = cy - totalH / 2 + lh / 2;
+  for (const line of lines) {
+    drawText(line, cx, y, size, BRAND.colors.ink, font, weight);
+    y += lh;
+  }
+}
+
+function wrapTextLines(text, size, font, maxW, weight = 500) {
+  ctx.font = `${weight} ${size}px ${font}`;
+  const words = text.split(/\s+/).filter(Boolean);
+  if (!words.length) return [];
+  const lines = [];
+  let line = words[0];
+  for (let i = 1; i < words.length; i++) {
+    const test = `${line} ${words[i]}`;
+    if (ctx.measureText(test).width <= maxW) line = test;
+    else {
+      lines.push(line);
+      line = words[i];
+    }
+  }
+  lines.push(line);
+  return lines;
+}
+
 function drawGameOver() {
   const min = Math.min(W, H);
   const appear = Math.min(1, stateTime / BURST_APPEAR);
-  const scale = easeOutBack(appear);
+  const qrAppear = Math.min(1, Math.max(0, stateTime - 0.12) / BURST_APPEAR);
 
   ctx.save();
-  const burst = renderer.drawFinalChrome(scale);
-  const cx = burst.cx;
-  const cy = burst.cy;
+  renderer.drawFinalBase();
+  renderer.drawFinalLogo();
 
-  // Контент масштабируется вместе с кляксой вокруг её центра.
-  ctx.translate(cx, cy);
-  ctx.scale(Math.max(0.001, scale), Math.max(0.001, scale));
-  ctx.translate(-cx, -cy);
+  drawVictoryText(W / 2, H * 0.32, min, appear);
 
-  drawText("ПОБЕДА!", cx, cy - burst.h * 0.22, min * 0.065, BRAND.colors.ink, BRAND.fonts.brand);
-  drawText(
-    `Игрок ${Math.max(0, winner) + 1}`,
-    cx,
-    cy - burst.h * 0.12,
-    min * 0.032,
-    BRAND.colors.ink,
-    BRAND.fonts.ui
-  );
-  drawText(
-    `${game.scores[0]} : ${game.scores[1]}`,
-    cx,
-    cy - burst.h * 0.01,
-    min * 0.04,
-    BRAND.colors.ink,
-    BRAND.fonts.brand
-  );
-
-  drawText(
-    "ЧИТАЙТЕ ЖУРНАЛ В ТЕЛЕГРАМЕ",
-    cx,
-    cy + burst.h * 0.105,
-    min * 0.024,
-    BRAND.colors.ink,
-    BRAND.fonts.brand,
-    700
-  );
-
-  // QR — в нижней части «кляксы». Белая подложка под QR и подписью,
-  // чтобы блок не проваливался в зубцы «кляксы».
-  const qrSize = min * 0.14;
-  const qrCenterY = cy + burst.h * 0.26;
-  const subSize = min * 0.02;
-  const subY = qrCenterY + qrSize / 2 + min * 0.02;
-
-  ctx.save();
-  ctx.font = `700 ${subSize}px ${BRAND.fonts.brand}`;
-  const cardW = Math.max(qrSize, ctx.measureText(BRAND.ctaSub).width) + min * 0.04;
-  const cardTop = qrCenterY - qrSize / 2 - min * 0.015;
-  const cardBottom = subY + subSize * 0.8 + min * 0.012;
-  ctx.fillStyle = BRAND.colors.field;
-  ctx.beginPath();
-  ctx.roundRect(cx - cardW / 2, cardTop, cardW, cardBottom - cardTop, min * 0.02);
-  ctx.fill();
-  ctx.restore();
-
-  drawQR(cx, qrCenterY, qrSize);
-  drawText(BRAND.ctaSub, cx, subY, subSize, BRAND.colors.ink, BRAND.fonts.brand, 700);
+  const burst = renderer.drawFinalQrBlob(easeOutBack(qrAppear));
+  drawGameOverQrContent(burst, min);
 
   ctx.restore();
 }
