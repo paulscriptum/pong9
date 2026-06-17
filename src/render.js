@@ -885,15 +885,30 @@ export class Renderer {
 
   drawStandbyBubble(phrase, headX, headY, { alpha = 1, scale = 1 } = {}) {
     const layout = this._layoutPromoBubble(phrase);
+    const ts = STANDBY_BUBBLE.textScale;
+    const fit = {
+      ...layout.fit,
+      size: layout.fit.size * ts,
+      lineH: layout.fit.lineH * ts,
+      blockH: layout.fit.blockH * ts,
+    };
     const bubbleW = layout.bubbleW * STANDBY_BUBBLE.widthScale;
-    const bubbleH = layout.bubbleH;
+    const bubbleH = layout.bubbleH * STANDBY_BUBBLE.heightScale;
+    const inset = this._promoTextInset();
+    const textX = bubbleW * STANDBY_BUBBLE.textAlignX + inset.x;
+    const textOy = bubbleH * PROMO_BUBBLE.textOffsetY + inset.y;
     const bubbleCx = headX + bubbleW * STANDBY_BUBBLE.tailFromCenterX;
     const bubbleCy = headY - bubbleH * STANDBY_BUBBLE.tailFromCenterY;
-    this._drawPromoBubbleLayout({ ...layout, bubbleW, bubbleH }, bubbleCx, bubbleCy, {
-      alpha,
-      scale,
-      textShiftX: layout.fit.size * STANDBY_BUBBLE.textShiftXRatio,
-    });
+    this._drawPromoBubbleLayout(
+      { ...layout, fit, bubbleW, bubbleH, textX, textOy },
+      bubbleCx,
+      bubbleCy,
+      {
+        alpha,
+        scale,
+        textShiftX: fit.size * STANDBY_BUBBLE.textShiftXRatio,
+      }
+    );
   }
 
   drawStandbyBubbleForCaterpillar(phrase, { pivotX, pivotY, catW, catH, scaleX, scaleY }) {

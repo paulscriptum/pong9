@@ -8,6 +8,12 @@ import { makeQRCanvas } from "./blobs.js";
 import { PongGame } from "./game.js";
 import { Renderer } from "./render.js";
 import { setupControls } from "./controls.js";
+import {
+  STANDBY_WORM_TRACK_START,
+  STANDBY_WORM_TRACK_END,
+  mapVideoNormToScreen,
+  sampleWormHead,
+} from "./standbyWormTrack.js";
 
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
@@ -49,31 +55,36 @@ function syncStandbyWormPlayback() {
   }
 }
 
-// Speech bubble на экране сна: левые угла по очереди, 3 с показ + 8 с пауза.
-const STANDBY_BUBBLE_CORNERS = {
-  showSeconds: 3,
-  pauseSeconds: 8,
-  startDelay: 2,
-  appearSeconds: 0.35,
+// Тонкая подгонка привязки блоба к голове (пиксели экрана).
+const STANDBY_BUBBLE_ATTACH = {
+  offsetX: 18,
+  offsetY: -24,
 };
-window._standbyBubbleCorners = STANDBY_BUBBLE_CORNERS;
+window._standbyBubbleAttach = STANDBY_BUBBLE_ATTACH;
 
-function getStandbyBubbleState() {
-  const { showSeconds, pauseSeconds, startDelay, appearSeconds } = STANDBY_BUBBLE_CORNERS;
-  const t = elapsed - startDelay;
-  if (t < 0) return null;
+function getStandbyBubbleHead() {
+  if (!standbyWormVideo || !standbyWormReady) return null;
 
-  const cycleDuration = showSeconds + pauseSeconds;
-  const cycle = Math.floor(t / cycleDuration);
+  const videoTime = standbyWormVideo.currentTime;
+  if (videoTime < STANDBY_WORM_TRACK_START || videoTime > STANDBY_WORM_TRACK_END + 0.05) {
+    return null;
+  }
 
-  const phaseT = t - cycle * cycleDuration;
-  if (phaseT >= showSeconds) return null;
+  const head = sampleWormHead(videoTime);
+  if (!head) return null;
 
-  const appear = Math.min(1, phaseT / appearSeconds);
+  const screen = mapVideoNormToScreen(
+    head.x,
+    head.y,
+    standbyWormVideo.videoWidth,
+    standbyWormVideo.videoHeight,
+    W,
+    H
+  );
+
   return {
-    corner: cycle % 2,
-    alpha: appear,
-    scale: 0.88 + 0.12 * appear,
+    x: screen.x + STANDBY_BUBBLE_ATTACH.offsetX,
+    y: screen.y + STANDBY_BUBBLE_ATTACH.offsetY,
   };
 }
 
@@ -363,12 +374,9 @@ function drawAttract() {
   ctx.globalAlpha = 1;
 
   if (standbyWormReady) {
-    const bubble = getStandbyBubbleState();
-    if (bubble) {
-      renderer.drawStandbyBubbleCorner(BRAND.standbyPhrase, bubble.corner, {
-        alpha: bubble.alpha,
-        scale: bubble.scale,
-      });
+    const head = getStandbyBubbleHead();
+    if (head) {
+      renderer.drawStandbyBubble(BRAND.standbyPhrase, head.x, head.y);
     }
   }
 
