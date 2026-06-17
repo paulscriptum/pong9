@@ -110,13 +110,45 @@ const PROMO_BUBBLE = {
 
 // Бабл на экране сна: хвост снизу-слева, крепится к голове гусеницы.
 const STANDBY_BUBBLE = {
-  widthScale: 1.14,
+  widthScale: 1.311,
+  heightScale: 1.55,
+  textScale: 1.3,
   tailFromCenterX: 0.48,
   tailFromCenterY: 0.68,
   headOffsetX: 0.36,
   headOffsetY: 0.28,
-  textShiftXRatio: -0.68,
+  textAlignX: -0.38,
+  textShiftXRatio: -0.78,
+  rotateDeg: 30,
+  hideLeftRatio: 0.15,
+  anchorYTop: 0.11,
+  anchorYBottom: 0.87,
 };
+
+function rotatedBubbleBounds(w, h, rot) {
+  const hw = w / 2;
+  const hh = h / 2;
+  const cos = Math.cos(rot);
+  const sin = Math.sin(rot);
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minY = Infinity;
+  let maxY = -Infinity;
+  for (const [lx, ly] of [
+    [-hw, -hh],
+    [hw, -hh],
+    [hw, hh],
+    [-hw, hh],
+  ]) {
+    const rx = lx * cos - ly * sin;
+    const ry = lx * sin + ly * cos;
+    minX = Math.min(minX, rx);
+    maxX = Math.max(maxX, rx);
+    minY = Math.min(minY, ry);
+    maxY = Math.max(maxY, ry);
+  }
+  return { minX, maxX, minY, maxY };
+}
 
 const FIGMA = {
   w: 716,
@@ -778,12 +810,18 @@ export class Renderer {
     ctx.fill();
   }
 
-  _drawPromoBubbleLayout(layout, bubbleCx, bubbleCy, { alpha = 1, scale = 1, textShiftX = 0 } = {}) {
+  _drawPromoBubbleLayout(
+    layout,
+    bubbleCx,
+    bubbleCy,
+    { alpha = 1, scale = 1, textShiftX = 0, rotation = 0 } = {}
+  ) {
     const ctx = this.ctx;
     const { bubbleW, bubbleH, fit, textX, textOy } = layout;
 
     ctx.save();
     ctx.translate(bubbleCx, bubbleCy);
+    ctx.rotate(rotation);
     ctx.scale(scale, scale);
     ctx.globalAlpha = alpha;
 
@@ -805,13 +843,55 @@ export class Renderer {
     ctx.restore();
   }
 
-  drawStandbyBubble(phrase, headX, headY) {
+  drawStandbyBubbleCorner(phrase, corner, { alpha = 1, scale = 1 } = {}) {
+    const layout = this._layoutPromoBubble(phrase);
+    const ts = STANDBY_BUBBLE.textScale;
+    const fit = {
+      ...layout.fit,
+      size: layout.fit.size * ts,
+      lineH: layout.fit.lineH * ts,
+      blockH: layout.fit.blockH * ts,
+    };
+    const bubbleW = layout.bubbleW * STANDBY_BUBBLE.widthScale;
+    const bubbleH = layout.bubbleH * STANDBY_BUBBLE.heightScale;
+    // Верхний угол — завал направо; нижний — налево.
+    const rotDeg = corner === 0 ? STANDBY_BUBBLE.rotateDeg : -STANDBY_BUBBLE.rotateDeg;
+    const rotation = (rotDeg * Math.PI) / 180;
+    const bounds = rotatedBubbleBounds(bubbleW, bubbleH, rotation);
+    const hiddenLeft = bubbleW * STANDBY_BUBBLE.hideLeftRatio;
+
+    const bubbleCx = -hiddenLeft - bounds.minX;
+    const bubbleCy =
+      corner === 0
+        ? this.h * STANDBY_BUBBLE.anchorYTop
+        : this.h * STANDBY_BUBBLE.anchorYBottom;
+
+    const inset = this._promoTextInset();
+    const textX = bubbleW * STANDBY_BUBBLE.textAlignX + inset.x;
+    const textOy = bubbleH * PROMO_BUBBLE.textOffsetY + inset.y;
+
+    this._drawPromoBubbleLayout(
+      { ...layout, fit, bubbleW, bubbleH, textX, textOy },
+      bubbleCx,
+      bubbleCy,
+      {
+        alpha,
+        scale,
+        rotation,
+        textShiftX: fit.size * STANDBY_BUBBLE.textShiftXRatio,
+      }
+    );
+  }
+
+  drawStandbyBubble(phrase, headX, headY, { alpha = 1, scale = 1 } = {}) {
     const layout = this._layoutPromoBubble(phrase);
     const bubbleW = layout.bubbleW * STANDBY_BUBBLE.widthScale;
     const bubbleH = layout.bubbleH;
     const bubbleCx = headX + bubbleW * STANDBY_BUBBLE.tailFromCenterX;
     const bubbleCy = headY - bubbleH * STANDBY_BUBBLE.tailFromCenterY;
     this._drawPromoBubbleLayout({ ...layout, bubbleW, bubbleH }, bubbleCx, bubbleCy, {
+      alpha,
+      scale,
       textShiftX: layout.fit.size * STANDBY_BUBBLE.textShiftXRatio,
     });
   }

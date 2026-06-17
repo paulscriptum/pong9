@@ -49,57 +49,32 @@ function syncStandbyWormPlayback() {
   }
 }
 
-// Траектория speech bubble — подгоняется под голову гусеницы в fullscreen-видео.
-const STANDBY_BUBBLE_TRACK = {
-  heightScale: 0.08,
-  baseY: 0.72,
-  crawlSpeed: 5.508,
-  moveSpeed: 165.24,
-  waveAmp: 0.035,
+// Speech bubble на экране сна: левые угла по очереди, 3 с показ + 8 с пауза.
+const STANDBY_BUBBLE_CORNERS = {
+  showSeconds: 3,
+  pauseSeconds: 8,
   startDelay: 2,
-  endDelay: 3.63,
-  offsetX: 0,
-  offsetY: 0,
+  appearSeconds: 0.35,
 };
-window._standbyBubbleTrack = STANDBY_BUBBLE_TRACK;
+window._standbyBubbleCorners = STANDBY_BUBBLE_CORNERS;
 
-function getStandbyBubbleAnchor() {
-  const min = Math.min(W, H);
-  const catH = min * STANDBY_BUBBLE_TRACK.heightScale;
-  const aspectRatio =
-    standbyWormVideo?.videoWidth > 0
-      ? standbyWormVideo.videoWidth / standbyWormVideo.videoHeight
-      : 16 / 9;
-  const catW = catH * aspectRatio;
-
-  const speed = STANDBY_BUBBLE_TRACK.moveSpeed;
-  const totalPath = W + catW * 3;
-  const travelDuration = totalPath / speed;
-  const { startDelay, endDelay } = STANDBY_BUBBLE_TRACK;
-
-  let rawX = 0;
-  let crawlT = 0;
+function getStandbyBubbleState() {
+  const { showSeconds, pauseSeconds, startDelay, appearSeconds } = STANDBY_BUBBLE_CORNERS;
   const t = elapsed - startDelay;
-  if (t > 0) {
-    const loopDuration = travelDuration + endDelay;
-    const phase = t % loopDuration;
-    if (phase < travelDuration) {
-      rawX = phase * speed;
-      crawlT = phase;
-    } else {
-      rawX = totalPath;
-      crawlT = travelDuration;
-    }
-  }
+  if (t < 0) return null;
 
-  const crawl = crawlT * STANDBY_BUBBLE_TRACK.crawlSpeed;
-  const catX = W + catW - rawX;
-  const baseY = H * STANDBY_BUBBLE_TRACK.baseY;
-  const waveY = Math.sin(crawl) * catH * STANDBY_BUBBLE_TRACK.waveAmp;
-  const cx = catX - catW / 2 + STANDBY_BUBBLE_TRACK.offsetX;
-  const cy = baseY + catH + waveY + STANDBY_BUBBLE_TRACK.offsetY;
+  const cycleDuration = showSeconds + pauseSeconds;
+  const cycle = Math.floor(t / cycleDuration);
 
-  return { pivotX: cx, pivotY: cy, catW, catH, scaleX: 1, scaleY: 1 };
+  const phaseT = t - cycle * cycleDuration;
+  if (phaseT >= showSeconds) return null;
+
+  const appear = Math.min(1, phaseT / appearSeconds);
+  return {
+    corner: cycle % 2,
+    alpha: appear,
+    scale: 0.88 + 0.12 * appear,
+  };
 }
 
 let W = 0;
@@ -388,7 +363,13 @@ function drawAttract() {
   ctx.globalAlpha = 1;
 
   if (standbyWormReady) {
-    renderer.drawStandbyBubbleForCaterpillar(BRAND.standbyPhrase, getStandbyBubbleAnchor());
+    const bubble = getStandbyBubbleState();
+    if (bubble) {
+      renderer.drawStandbyBubbleCorner(BRAND.standbyPhrase, bubble.corner, {
+        alpha: bubble.alpha,
+        scale: bubble.scale,
+      });
+    }
   }
 
   ctx.restore();
