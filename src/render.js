@@ -243,38 +243,17 @@ export class Renderer {
     this.mascotPopups = []; // Маскоты, появляющиеся при отбивании/голах
     this.layout = computeSceneLayout(0, 0);
     this.bottomButtonRects = null;
-    this.promoPhrase = BRAND.promoPhrases[0];
+    this.promoPhrase = BRAND.promoPhrases[0] ?? "";
+    this.promoIdx = 0;
     this.promoTimer = 0;
     this.promoAnim = 1;
-    this.promoDeck = [];
-    this.promoDeckIdx = 0;
-    this._pickPromoPhrase();
   }
 
-  _shufflePromoDeck(exclude = "") {
-    const phrases = [...BRAND.promoPhrases];
-    for (let i = phrases.length - 1; i > 0; i--) {
-      const j = (Math.random() * (i + 1)) | 0;
-      [phrases[i], phrases[j]] = [phrases[j], phrases[i]];
-    }
-    if (phrases.length > 1 && phrases[0] === exclude) {
-      [phrases[0], phrases[1]] = [phrases[1], phrases[0]];
-    }
-    this.promoDeck = phrases;
-    this.promoDeckIdx = 0;
-  }
-
-  _pickPromoPhrase(exclude = "") {
+  _advancePromoPhrase() {
     const phrases = BRAND.promoPhrases;
     if (!phrases.length) return;
-    if (phrases.length === 1) {
-      this.promoPhrase = phrases[0];
-      return;
-    }
-    if (!this.promoDeck.length || this.promoDeckIdx >= this.promoDeck.length) {
-      this._shufflePromoDeck(exclude);
-    }
-    this.promoPhrase = this.promoDeck[this.promoDeckIdx++];
+    this.promoIdx = (this.promoIdx + 1) % phrases.length;
+    this.promoPhrase = phrases[this.promoIdx];
   }
 
   updatePromo(dt) {
@@ -285,7 +264,7 @@ export class Renderer {
     if (this.promoTimer >= BRAND.promoRotateSeconds) {
       this.promoTimer = 0;
       this.promoAnim = 0;
-      this._pickPromoPhrase(this.promoPhrase);
+      this._advancePromoPhrase();
     }
   }
 
