@@ -480,6 +480,26 @@ export class Renderer {
     return this.bottomButtonRects;
   }
 
+  computeBottomButtonHitRects() {
+    const { field, bottomButtons } = this.layout;
+    const pillH = bottomButtons.h;
+    const pillY = bottomButtons.y;
+    const restartW = field.w * 0.224;
+    const restartX = field.x + field.w * 0.031;
+    const sleepW = field.w * 0.249;
+    const sleepX = field.x + field.w - sleepW;
+    const hitPad = pillH * 0.9;
+    const handPad = pillH * 1.2;
+    return {
+      restart: { x: restartX, y: pillY - hitPad, w: restartW, h: pillH + hitPad },
+      sleep: { x: sleepX - sleepW * 0.2, y: pillY - handPad, w: sleepW * 1.2, h: pillH + handPad },
+    };
+  }
+
+  getBottomButtonHitRects() {
+    return this.bottomButtonRects ?? this.computeBottomButtonHitRects();
+  }
+
   setSize(w, h) {
     this.w = w;
     this.h = h;
@@ -959,11 +979,7 @@ export class Renderer {
     this.drawCenterPromo(field);
 
     // Зоны нажатия (захватываем и торчащие иконки).
-    const hitPad = pillH * 0.9;
-    this.bottomButtonRects = {
-      restart: { x: restartX, y: pillY - hitPad, w: restartW, h: pillH + hitPad },
-      sleep: { x: sleepX, y: pillY - hitPad, w: sleepW, h: pillH + hitPad },
-    };
+    this.bottomButtonRects = this.computeBottomButtonHitRects();
 
     ctx.restore();
   }

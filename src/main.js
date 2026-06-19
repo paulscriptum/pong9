@@ -29,14 +29,18 @@ let standbyWormReady = false;
 function onStandbyWormReady() {
   if (!standbyWormVideo || standbyWormVideo.videoWidth <= 0) return;
   standbyWormReady = true;
+  window._standbyWormReady = true;
   syncStandbyWormPlayback();
 }
 
 if (standbyWormVideo) {
   standbyWormVideo.addEventListener("loadedmetadata", onStandbyWormReady);
+  standbyWormVideo.addEventListener("loadeddata", onStandbyWormReady);
   standbyWormVideo.addEventListener("canplay", onStandbyWormReady);
   standbyWormVideo.addEventListener("error", () => {
     standbyWormReady = false;
+    window._standbyWormReady = false;
+    window._standbyVideoError = standbyWormVideo.error;
   });
 }
 
@@ -44,15 +48,31 @@ function syncStandbyLayer() {
   if (standbyLayer) standbyLayer.hidden = state !== STATE.ATTRACT;
 }
 
-function syncStandbyWormPlayback() {
-  if (!standbyWormVideo) return;
-  if (state !== STATE.ATTRACT || !standbyWormReady) {
-    if (!standbyWormVideo.paused) standbyWormVideo.pause();
+function pauseStandbyVideo() {
+  if (!standbyWormVideo || standbyWormVideo.paused) return;
+  standbyWormVideo.pause();
+}
+
+function resumeStandbyVideo() {
+  if (!standbyWormVideo || state !== STATE.ATTRACT) return;
+  syncStandbyLayer();
+  if (!standbyWormReady) {
+    standbyWormVideo.load();
     return;
   }
   if (standbyWormVideo.paused) {
-    standbyWormVideo.play().catch(() => {});
+    const playAttempt = standbyWormVideo.play();
+    if (playAttempt?.catch) playAttempt.catch(() => {});
   }
+}
+
+function syncStandbyWormPlayback() {
+  if (!standbyWormVideo) return;
+  if (state !== STATE.ATTRACT || !standbyWormReady) {
+    pauseStandbyVideo();
+    return;
+  }
+  resumeStandbyVideo();
 }
 
 // Тонкая подгонка привязки блоба к голове (пиксели экрана).
@@ -167,6 +187,7 @@ function goAttract() {
   // Скрываем кнопки в standby режиме
   document.getElementById("controls").style.display = "none";
   setState(STATE.ATTRACT);
+  resumeStandbyVideo();
 }
 
 function goGameOver() {
@@ -206,7 +227,7 @@ function handleBottomButtonClick(x, y) {
   // Пилюли есть только на игровых экранах (на standby и финальном их нет).
   if (state === STATE.ATTRACT || state === STATE.GAMEOVER) return false;
 
-  const rects = renderer.getBottomButtonRects();
+  const rects = renderer.getBottomButtonHitRects();
   if (!rects) return false;
 
   // Сначала «Режим сна» — у правой кнопки раньше была широкая прозрачная зона.
@@ -365,6 +386,12 @@ function drawAttract() {
   ctx.clearRect(0, 0, W, H);
   syncStandbyLayer();
   syncStandbyWormPlayback();
+
+  // Фиолетовый фон на canvas, пока видео не готово (или слой скрыт).
+  if (!standbyWormReady || standbyLayer?.hidden) {
+    ctx.fillStyle = STANDBY.bg;
+    ctx.fillRect(0, 0, W, H);
+  }
 
   // Текст "НАЖМИТЕ, ЧТОБЫ ИГРАТЬ" по центру (пульсирующий)
   ctx.save();
@@ -582,6 +609,8 @@ function init() {
   setState(STATE.ATTRACT);
 
   setupKiosk();
+
+  if (standbyWormVideo) standbyWormVideo.load();
 
   setupControls({
     onFirstGesture: () => Sfx.unlock(),
