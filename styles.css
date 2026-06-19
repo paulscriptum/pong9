@@ -146,6 +146,16 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 
+#gameover-shield {
+  position: absolute;
+  inset: 0;
+  z-index: 100;
+  pointer-events: auto;
+  touch-action: none;
+  background: transparent;
+  -webkit-tap-highlight-color: transparent;
+}
+
 /* ---- Тач-управление (квадраты со стрелками-шевронами, как в макете) ---- */
 .controls {
   position: absolute;

@@ -25,11 +25,14 @@ const standbyWormVideo = document.getElementById("standby-worm");
 const bottomActionsLayer = document.getElementById("bottom-actions");
 const btnRestart = document.getElementById("btn-restart");
 const btnSleep = document.getElementById("btn-sleep");
+const gameoverShield = document.getElementById("gameover-shield");
 
 let standbyWormReady = false;
 let suppressCanvasTapUntil = 0;
 let bottomActionLockUntil = 0;
 let activeBottomButton = null;
+let gameOverDismissAt = 0;
+let gameOverLeaving = false;
 
 function canAcceptCanvasTap() {
   return performance.now() >= suppressCanvasTapUntil && performance.now() >= bottomActionLockUntil;
@@ -89,6 +92,24 @@ if (standbyWormVideo) {
 
 function syncStandbyLayer() {
   if (standbyLayer) standbyLayer.hidden = state !== STATE.ATTRACT;
+}
+
+function syncGameOverShield() {
+  if (!gameoverShield) return;
+  const show = state === STATE.GAMEOVER;
+  gameoverShield.hidden = !show;
+  gameoverShield.setAttribute("aria-hidden", show ? "false" : "true");
+}
+
+function isGameOverLocked() {
+  return state === STATE.GAMEOVER && performance.now() < gameOverDismissAt;
+}
+
+function blockGameOverEvent(e) {
+  if (!isGameOverLocked()) return;
+  e.preventDefault();
+  e.stopPropagation();
+  if (e.stopImmediatePropagation) e.stopImmediatePropagation();
 }
 
 function pauseStandbyVideo() {
@@ -233,6 +254,7 @@ function setState(s) {
   stateTime = 0;
   window._debugState = s;
   syncStandbyLayer();
+  syncGameOverShield();
   syncBottomButtonsLayout();
   if (s === STATE.ATTRACT && standbyWormVideo) {
     standbyWormVideo.currentTime = 0;
@@ -241,6 +263,7 @@ function setState(s) {
 }
 
 function startMatch() {
+  if (state === STATE.GAMEOVER || isGameOverLocked()) return;
   // Показываем кнопки при начале игры
   document.getElementById("controls").style.display = "";
   game.resetMatch();
@@ -250,6 +273,11 @@ function startMatch() {
 }
 
 function goAttract() {
+  if (isGameOverLocked() && !gameOverLeaving) return;
+  gameOverLeaving = false;
+  gameOverDismissAt = 0;
+  suppressCanvasTapUntil = 0;
+  bottomActionLockUntil = 0;
   qrCanvas = null;
   game.clearInput();
   game.resetMatch();
@@ -266,6 +294,9 @@ function goGameOver() {
   game.clearInput();
   qrCanvas = null;
   document.getElementById("controls").style.display = "none";
+  gameOverLeaving = false;
+  gameOverDismissAt = performance.now() + BRAND.game.gameOverSeconds * 1000;
+  lockCanvasTap(BRAND.game.gameOverSeconds * 1000 + 600);
   Sfx.win();
   setState(STATE.GAMEOVER);
 }
@@ -352,7 +383,7 @@ function setupBottomButtons() {
 
 function onUserTap() {
   if (!canAcceptCanvasTap()) return false;
-  if (state === STATE.GAMEOVER) return false;
+  if (state === STATE.GAMEOVER || isGameOverLocked()) return false;
   Sfx.unlock();
   tryFullscreen();
   if (state === STATE.ATTRACT) {
@@ -430,7 +461,10 @@ function update(dt) {
       break;
 
     case STATE.GAMEOVER:
-      if (stateTime >= BRAND.game.gameOverSeconds) goAttract();
+      if (stateTime >= BRAND.game.gameOverSeconds) {
+        gameOverLeaving = true;
+        goAttract();
+      }
       break;
   }
 }
@@ -680,6 +714,21 @@ function setupKiosk() {
   });
 }
 
+function setupGameOverShield() {
+  if (!gameoverShield) return;
+  const types = ["pointerdown", "pointerup", "click", "touchstart", "touchend", "mousedown", "mouseup"];
+  for (const type of types) {
+    gameoverShield.addEventListener(type, blockGameOverEvent, { passive: false });
+  }
+}
+
+function setupGameOverInputBlock() {
+  const types = ["pointerdown", "pointerup", "click", "touchstart", "touchend", "mousedown", "mouseup"];
+  for (const type of types) {
+    document.addEventListener(type, blockGameOverEvent, { capture: true, passive: false });
+  }
+}
+
 function init() {
   resize();
   window.addEventListener("resize", resize);
@@ -694,6 +743,8 @@ function init() {
   setState(STATE.ATTRACT);
 
   setupBottomButtons();
+  setupGameOverShield();
+  setupGameOverInputBlock();
   setupControls({
     onFirstGesture: () => Sfx.unlock(),
     onInput: (player, dir, isDown) => {
@@ -705,8 +756,9 @@ function init() {
     "pointerdown",
     (e) => {
       if (e.target !== canvas) return;
-      if (state === STATE.GAMEOVER) {
+      if (state === STATE.GAMEOVER || isGameOverLocked()) {
         e.preventDefault();
+        e.stopPropagation();
         return;
       }
       if (!canAcceptCanvasTap()) {
@@ -722,6 +774,10 @@ function init() {
   document.addEventListener(
     "pointerdown",
     (e) => {
+      if (isGameOverLocked()) {
+        blockGameOverEvent(e);
+        return;
+      }
       if (state !== STATE.ATTRACT) return;
       if (!canAcceptCanvasTap()) {
         e.preventDefault();
@@ -739,6 +795,10 @@ function init() {
   document.addEventListener(
     "click",
     (e) => {
+      if (isGameOverLocked()) {
+        blockGameOverEvent(e);
+        return;
+      }
       if (!canAcceptCanvasTap() && e.target === canvas) {
         e.preventDefault();
         e.stopPropagation();
