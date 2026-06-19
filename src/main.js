@@ -132,8 +132,7 @@ function getStandbyBubbleHead() {
   if (videoTime < STANDBY_WORM_TRACK_START) return null;
 
   const head = sampleWormHead(videoTime);
-  // Скрываем, когда гусеница ушла далеко за левый край (бабл уже за экраном).
-  if (!head || head.x < -0.14) return null;
+  if (!head) return null;
 
   const screen = mapVideoNormToScreen(
     head.x,
@@ -144,10 +143,13 @@ function getStandbyBubbleHead() {
     H
   );
 
-  return {
+  const attach = {
     x: screen.x + STANDBY_BUBBLE_ATTACH.offsetX,
     y: screen.y + STANDBY_BUBBLE_ATTACH.offsetY,
   };
+
+  if (!renderer.isStandbyBubbleVisible(attach.x, attach.y, BRAND.standbyPhrase)) return null;
+  return attach;
 }
 
 let W = 0;

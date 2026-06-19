@@ -67,8 +67,9 @@ export function sampleWormHead(time) {
     const vx = dt > 0 ? (last[1] - prev[1]) / dt : 0;
     const vy = dt > 0 ? (last[2] - prev[2]) / dt : 0;
     const extra = t - last[0];
+    const vxBoost = 1.45;
     return {
-      x: last[1] + vx * extra,
+      x: last[1] + vx * extra * vxBoost,
       y: dampWormHeadY(last[2] + vy * extra),
     };
   }

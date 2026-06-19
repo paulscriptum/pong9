@@ -899,6 +899,19 @@ export class Renderer {
     );
   }
 
+  // Бабл ещё на экране, пока не уехал за левый край (с запасом).
+  isStandbyBubbleVisible(headX, headY, phrase) {
+    const layout = this._layoutPromoBubble(phrase, { fontScale: STANDBY_BUBBLE.fontScale });
+    const bubbleW = layout.bubbleW * STANDBY_BUBBLE.widthScale;
+    const bubbleH = layout.bubbleH * STANDBY_BUBBLE.heightScale;
+    const rot = (STANDBY_BUBBLE.rotateDeg * Math.PI) / 180;
+    const bounds = rotatedBubbleBounds(bubbleW, bubbleH, rot);
+    const bubbleCx = headX + bubbleW * STANDBY_BUBBLE.tailFromCenterX;
+    const bubbleCy = headY - bubbleH * STANDBY_BUBBLE.tailFromCenterY;
+    const offLeft = -bubbleW * 0.35;
+    return bubbleCx + bounds.maxX > offLeft && bubbleCy + bounds.maxY > -bubbleH;
+  }
+
   drawStandbyBubbleForCaterpillar(phrase, { pivotX, pivotY, catW, catH, scaleX, scaleY }) {
     const headX = pivotX + (-catW / 2 + catH * STANDBY_BUBBLE.headOffsetX) * scaleX;
     const headY = pivotY + (-catH + catH * STANDBY_BUBBLE.headOffsetY) * scaleY;
