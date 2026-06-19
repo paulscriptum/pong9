@@ -352,15 +352,12 @@ function setupBottomButtons() {
 
 function onUserTap() {
   if (!canAcceptCanvasTap()) return false;
+  if (state === STATE.GAMEOVER) return false;
   Sfx.unlock();
   tryFullscreen();
   if (state === STATE.ATTRACT) {
     renderer.resetPromoPhrase();
     startMatch();
-    return true;
-  }
-  if (state === STATE.GAMEOVER) {
-    goAttract();
     return true;
   }
   return false;
@@ -708,6 +705,10 @@ function init() {
     "pointerdown",
     (e) => {
       if (e.target !== canvas) return;
+      if (state === STATE.GAMEOVER) {
+        e.preventDefault();
+        return;
+      }
       if (!canAcceptCanvasTap()) {
         e.preventDefault();
         return;
