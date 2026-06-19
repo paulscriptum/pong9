@@ -29,6 +29,18 @@ const btnSleep = document.getElementById("btn-sleep");
 
 let standbyWormReady = false;
 let suppressCanvasTapUntil = 0;
+let bottomActionLockUntil = 0;
+let activeBottomButton = null;
+
+function canAcceptCanvasTap() {
+  return performance.now() >= suppressCanvasTapUntil && performance.now() >= bottomActionLockUntil;
+}
+
+function lockCanvasTap(ms = 1000) {
+  const until = performance.now() + ms;
+  suppressCanvasTapUntil = until;
+  bottomActionLockUntil = until;
+}
 
 function prefersOpaqueStandbyVideo() {
   const ua = navigator.userAgent;
@@ -56,10 +68,6 @@ function initStandbyVideoSource() {
     standbyWormVideo.appendChild(webm);
     standbyWormVideo.appendChild(mov);
   }
-}
-
-function suppressCanvasTap(ms = 450) {
-  suppressCanvasTapUntil = performance.now() + ms;
 }
 
 function onStandbyWormReady() {
@@ -191,6 +199,7 @@ function applyHitRect(el, rect) {
 function syncBottomButtonsLayout() {
   if (!bottomActionsLayer) return;
   const show = state !== STATE.ATTRACT && state !== STATE.GAMEOVER;
+  if (!show && activeBottomButton) return;
   bottomActionsLayer.hidden = !show;
   if (!show) return;
   const rects = renderer.getBottomButtonHitRects();
@@ -275,37 +284,68 @@ function tryFullscreen() {
   }
 }
 
-function onBottomRestart(e) {
+function runBottomRestart() {
   if (state === STATE.ATTRACT || state === STATE.GAMEOVER) return;
-  e.preventDefault();
-  e.stopPropagation();
   Sfx.unlock();
-  suppressCanvasTap();
+  lockCanvasTap();
   startMatch();
 }
 
-function onBottomSleep(e) {
+function runBottomSleep() {
   if (state === STATE.ATTRACT || state === STATE.GAMEOVER) return;
-  e.preventDefault();
-  e.stopPropagation();
   Sfx.unlock();
-  suppressCanvasTap();
+  lockCanvasTap();
   goAttract();
+}
+
+function clearBottomButtonGesture() {
+  activeBottomButton = null;
+  syncBottomButtonsLayout();
 }
 
 function setupBottomButtons() {
   if (!btnRestart || !btnSleep) return;
-  for (const btn of [btnRestart, btnSleep]) {
-    btn.addEventListener("pointerdown", (e) => {
-      if (btn === btnRestart) onBottomRestart(e);
-      else onBottomSleep(e);
+
+  const bindBottomButton = (btn, action) => {
+    btn.addEventListener(
+      "pointerdown",
+      (e) => {
+        if (state === STATE.ATTRACT || state === STATE.GAMEOVER) return;
+        e.preventDefault();
+        e.stopPropagation();
+        activeBottomButton = btn;
+        try {
+          btn.setPointerCapture(e.pointerId);
+        } catch (_) {}
+      },
+      { passive: false }
+    );
+
+    const finish = (e) => {
+      if (activeBottomButton !== btn) return;
+      e.preventDefault();
+      e.stopPropagation();
+      try {
+        btn.releasePointerCapture(e.pointerId);
+      } catch (_) {}
+      activeBottomButton = null;
+      action();
+    };
+
+    btn.addEventListener("pointerup", finish, { passive: false });
+    btn.addEventListener("pointercancel", clearBottomButtonGesture, { passive: false });
+    btn.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
     });
-    btn.addEventListener("click", (e) => e.preventDefault());
-  }
+  };
+
+  bindBottomButton(btnRestart, runBottomRestart);
+  bindBottomButton(btnSleep, runBottomSleep);
 }
 
 function onUserTap() {
-  if (performance.now() < suppressCanvasTapUntil) return false;
+  if (!canAcceptCanvasTap()) return false;
   Sfx.unlock();
   tryFullscreen();
   if (state === STATE.ATTRACT) {
@@ -657,17 +697,44 @@ function init() {
     },
   });
 
-  canvas.addEventListener("pointerdown", (e) => {
-    e.preventDefault();
-    onUserTap();
-  });
+  canvas.addEventListener(
+    "pointerdown",
+    (e) => {
+      if (e.target !== canvas) return;
+      if (!canAcceptCanvasTap()) {
+        e.preventDefault();
+        return;
+      }
+      e.preventDefault();
+      onUserTap();
+    },
+    { passive: false }
+  );
 
   document.addEventListener(
     "pointerdown",
     (e) => {
       if (state !== STATE.ATTRACT) return;
+      if (!canAcceptCanvasTap()) {
+        e.preventDefault();
+        return;
+      }
       if (e.target.closest("#bottom-actions, .ctrl-btn")) return;
+      if (e.target !== canvas) return;
+      e.preventDefault();
       onUserTap();
+    },
+    true
+  );
+
+  // iOS иногда шлёт отложенный click после touchend — глушим его после пилюль.
+  document.addEventListener(
+    "click",
+    (e) => {
+      if (!canAcceptCanvasTap() && e.target === canvas) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
     },
     true
   );
