@@ -47,9 +47,8 @@ export class PongGame {
   resize(width, height) {
     const c = this.cfg;
     const newH = c.paddleHeightRatio * height;
-    // Визуальные маскот-ракетки стоят глубже в поле, как в референсе.
-    const mascotMargin = 0.24 * Math.min(width, height);
-    const margin = Math.max(c.paddleMarginRatio * width, mascotMargin);
+    // Отступ только от ширины поля — не дёргается при смене высоты (моб. браузер).
+    const margin = Math.max(c.paddleMarginRatio * width, c.paddleInsetRatio * width);
 
     for (let i = 0; i < 2; i++) {
       const p = this.paddles[i];

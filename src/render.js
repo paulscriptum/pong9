@@ -1133,7 +1133,8 @@ export class Renderer {
       const imgAspect = img.naturalWidth / img.naturalHeight;
       const drawH = p.h;
       const drawW = drawH * imgAspect;
-      const x = p.x + p.w / 2 - drawW / 2;
+      // Внутренний край спрайта на hit-box — без горизонтального сдвига при resize.
+      const x = p.side === 0 ? p.x + p.w - drawW : p.x;
       const y = p.y + (p.h - drawH) / 2;
       ctx.drawImage(img, x, y, drawW, drawH);
     };

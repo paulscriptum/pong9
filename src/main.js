@@ -96,9 +96,15 @@ function pauseStandbyVideo() {
   standbyWormVideo.pause();
 }
 
+function applyStandbyPlaybackRate() {
+  if (!standbyWormVideo) return;
+  standbyWormVideo.playbackRate = BRAND.standbyWormPlaybackRate ?? 0.8;
+}
+
 function resumeStandbyVideo() {
   if (!standbyWormVideo || state !== STATE.ATTRACT) return;
   syncStandbyLayer();
+  applyStandbyPlaybackRate();
   if (!standbyWormReady) {
     standbyWormVideo.load();
     return;
@@ -685,6 +691,7 @@ function init() {
   setupKiosk();
 
   initStandbyVideoSource();
+  applyStandbyPlaybackRate();
   if (standbyWormVideo) standbyWormVideo.load();
 
   setState(STATE.ATTRACT);
