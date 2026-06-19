@@ -43,19 +43,42 @@ export const STANDBY_WORM_HEAD_TRACK = [
 ];
 export const STANDBY_WORM_TRACK_START = 0.1;
 export const STANDBY_WORM_TRACK_END = 7.9;
+// Центр колебаний головы по Y (норм. координаты видео) — для приглушения болтанки.
+export const STANDBY_WORM_Y_CENTER = 0.797;
+export const STANDBY_WORM_Y_DAMPING = 0.58;
+
+function dampWormHeadY(y) {
+  return STANDBY_WORM_Y_CENTER + (y - STANDBY_WORM_Y_CENTER) * STANDBY_WORM_Y_DAMPING;
+}
 
 export function sampleWormHead(time) {
   const track = STANDBY_WORM_HEAD_TRACK;
   if (!track.length) return null;
   const t = Math.max(0, time);
-  if (t <= track[0][0]) return { x: track[0][1], y: track[0][2] };
-  if (t >= track[track.length - 1][0]) return { x: track[track.length - 1][1], y: track[track.length - 1][2] };
+
+  if (t <= track[0][0]) {
+    return { x: track[0][1], y: dampWormHeadY(track[0][2]) };
+  }
+
+  const last = track[track.length - 1];
+  if (t >= last[0]) {
+    const prev = track[track.length - 2];
+    const dt = last[0] - prev[0];
+    const vx = dt > 0 ? (last[1] - prev[1]) / dt : 0;
+    const vy = dt > 0 ? (last[2] - prev[2]) / dt : 0;
+    const extra = t - last[0];
+    return {
+      x: last[1] + vx * extra,
+      y: dampWormHeadY(last[2] + vy * extra),
+    };
+  }
+
   for (let i = 0; i < track.length - 1; i++) {
     const [t0, x0, y0] = track[i];
     const [t1, x1, y1] = track[i + 1];
     if (t >= t0 && t <= t1) {
-      const f = (t1 - t0) > 0 ? (t - t0) / (t1 - t0) : 0;
-      return { x: x0 + (x1 - x0) * f, y: y0 + (y1 - y0) * f };
+      const f = t1 - t0 > 0 ? (t - t0) / (t1 - t0) : 0;
+      return { x: x0 + (x1 - x0) * f, y: dampWormHeadY(y0 + (y1 - y0) * f) };
     }
   }
   return null;

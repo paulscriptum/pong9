@@ -10,7 +10,6 @@ import { Renderer } from "./render.js";
 import { setupControls } from "./controls.js";
 import {
   STANDBY_WORM_TRACK_START,
-  STANDBY_WORM_TRACK_END,
   mapVideoNormToScreen,
   sampleWormHead,
 } from "./standbyWormTrack.js";
@@ -130,12 +129,11 @@ function getStandbyBubbleHead() {
   if (!standbyWormVideo || !standbyWormReady) return null;
 
   const videoTime = standbyWormVideo.currentTime;
-  if (videoTime < STANDBY_WORM_TRACK_START || videoTime > STANDBY_WORM_TRACK_END + 0.05) {
-    return null;
-  }
+  if (videoTime < STANDBY_WORM_TRACK_START) return null;
 
   const head = sampleWormHead(videoTime);
-  if (!head) return null;
+  // Скрываем, когда гусеница ушла далеко за левый край (бабл уже за экраном).
+  if (!head || head.x < -0.14) return null;
 
   const screen = mapVideoNormToScreen(
     head.x,
