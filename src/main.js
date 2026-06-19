@@ -642,13 +642,12 @@ function init() {
   window.addEventListener("resize", resize);
   window.addEventListener("orientationchange", resize);
   
-  // Инициализируем state
-  setState(STATE.ATTRACT);
-
   setupKiosk();
 
   initStandbyVideoSource();
   if (standbyWormVideo) standbyWormVideo.load();
+
+  setState(STATE.ATTRACT);
 
   setupBottomButtons();
   setupControls({
