@@ -23,8 +23,44 @@ const renderer = new Renderer(ctx);
 
 const standbyLayer = document.getElementById("standby-layer");
 const standbyWormVideo = document.getElementById("standby-worm");
+const bottomActionsLayer = document.getElementById("bottom-actions");
+const btnRestart = document.getElementById("btn-restart");
+const btnSleep = document.getElementById("btn-sleep");
 
 let standbyWormReady = false;
+let suppressCanvasTapUntil = 0;
+
+function prefersOpaqueStandbyVideo() {
+  const ua = navigator.userAgent;
+  // iOS и iPadOS: любой браузер на WebKit, альфа в <video> не работает.
+  if (/iPhone|iPad|iPod/i.test(ua)) return true;
+  // Desktop Safari.
+  return /Safari/i.test(ua) && !/Chrome|Chromium|Edg/i.test(ua);
+}
+
+function initStandbyVideoSource() {
+  if (!standbyWormVideo) return;
+  standbyWormVideo.replaceChildren();
+  if (prefersOpaqueStandbyVideo()) {
+    const src = document.createElement("source");
+    src.src = "/images/standby_worm_opaque.mp4";
+    src.type = "video/mp4";
+    standbyWormVideo.appendChild(src);
+  } else {
+    const webm = document.createElement("source");
+    webm.src = "/images/standby_worm.webm";
+    webm.type = "video/webm";
+    const mov = document.createElement("source");
+    mov.src = "/images/standby_worm.mov";
+    mov.type = "video/quicktime";
+    standbyWormVideo.appendChild(webm);
+    standbyWormVideo.appendChild(mov);
+  }
+}
+
+function suppressCanvasTap(ms = 450) {
+  suppressCanvasTapUntil = performance.now() + ms;
+}
 
 function onStandbyWormReady() {
   if (!standbyWormVideo || standbyWormVideo.videoWidth <= 0) return;
@@ -141,6 +177,25 @@ function syncControlsLayout() {
   root.style.setProperty("--ctl-r-up-y", `${c.rightUp.y}px`);
   root.style.setProperty("--ctl-r-down-x", `${c.rightDown.x}px`);
   root.style.setProperty("--ctl-r-down-y", `${c.rightDown.y}px`);
+  syncBottomButtonsLayout();
+}
+
+function applyHitRect(el, rect) {
+  if (!el || !rect) return;
+  el.style.left = `${rect.x}px`;
+  el.style.top = `${rect.y}px`;
+  el.style.width = `${rect.w}px`;
+  el.style.height = `${rect.h}px`;
+}
+
+function syncBottomButtonsLayout() {
+  if (!bottomActionsLayer) return;
+  const show = state !== STATE.ATTRACT && state !== STATE.GAMEOVER;
+  bottomActionsLayer.hidden = !show;
+  if (!show) return;
+  const rects = renderer.getBottomButtonHitRects();
+  applyHitRect(btnRestart, rects.restart);
+  applyHitRect(btnSleep, rects.sleep);
 }
 
 function resize() {
@@ -163,6 +218,7 @@ function setState(s) {
   stateTime = 0;
   window._debugState = s;
   syncStandbyLayer();
+  syncBottomButtonsLayout();
   if (s === STATE.ATTRACT && standbyWormVideo) {
     standbyWormVideo.currentTime = 0;
   }
@@ -219,56 +275,37 @@ function tryFullscreen() {
   }
 }
 
-function hitRect(rect, x, y) {
-  return x >= rect.x && x <= rect.x + rect.w && y >= rect.y && y <= rect.y + rect.h;
+function onBottomRestart(e) {
+  if (state === STATE.ATTRACT || state === STATE.GAMEOVER) return;
+  e.preventDefault();
+  e.stopPropagation();
+  Sfx.unlock();
+  suppressCanvasTap();
+  startMatch();
 }
 
-function handleBottomButtonClick(x, y) {
-  // Пилюли есть только на игровых экранах (на standby и финальном их нет).
-  if (state === STATE.ATTRACT || state === STATE.GAMEOVER) return false;
-
-  const rects = renderer.getBottomButtonHitRects();
-  if (!rects) return false;
-
-  // Сначала «Режим сна» — у правой кнопки раньше была широкая прозрачная зона.
-  if (hitRect(rects.sleep, x, y)) {
-    Sfx.unlock();
-    goAttract();
-    return true;
-  }
-  if (hitRect(rects.restart, x, y)) {
-    Sfx.unlock();
-    startMatch();
-    return true;
-  }
-  return false;
+function onBottomSleep(e) {
+  if (state === STATE.ATTRACT || state === STATE.GAMEOVER) return;
+  e.preventDefault();
+  e.stopPropagation();
+  Sfx.unlock();
+  suppressCanvasTap();
+  goAttract();
 }
 
-function pointerToCanvasCoords(e) {
-  const bounds = canvas.getBoundingClientRect();
-  return {
-    x: e.clientX - bounds.left,
-    y: e.clientY - bounds.top,
-    inside:
-      e.clientX >= bounds.left &&
-      e.clientX <= bounds.right &&
-      e.clientY >= bounds.top &&
-      e.clientY <= bounds.bottom,
-  };
-}
-
-function onCanvasPointerDown(e) {
-  const { x, y, inside } = pointerToCanvasCoords(e);
-  if (!inside) return false;
-  if (handleBottomButtonClick(x, y)) {
-    e.preventDefault();
-    e.stopPropagation();
-    return true;
+function setupBottomButtons() {
+  if (!btnRestart || !btnSleep) return;
+  for (const btn of [btnRestart, btnSleep]) {
+    btn.addEventListener("pointerdown", (e) => {
+      if (btn === btnRestart) onBottomRestart(e);
+      else onBottomSleep(e);
+    });
+    btn.addEventListener("click", (e) => e.preventDefault());
   }
-  return false;
 }
 
 function onUserTap() {
+  if (performance.now() < suppressCanvasTapUntil) return false;
   Sfx.unlock();
   tryFullscreen();
   if (state === STATE.ATTRACT) {
@@ -610,8 +647,10 @@ function init() {
 
   setupKiosk();
 
+  initStandbyVideoSource();
   if (standbyWormVideo) standbyWormVideo.load();
 
+  setupBottomButtons();
   setupControls({
     onFirstGesture: () => Sfx.unlock(),
     onInput: (player, dir, isDown) => {
@@ -620,30 +659,19 @@ function init() {
   });
 
   canvas.addEventListener("pointerdown", (e) => {
-    if (onCanvasPointerDown(e)) return;
     e.preventDefault();
     onUserTap();
   });
 
-  // Нижние кнопки — ловим в capture, чтобы клик не уходил в другие обработчики.
   document.addEventListener(
     "pointerdown",
     (e) => {
-      if (onCanvasPointerDown(e)) return;
-      if (state === STATE.ATTRACT) onUserTap();
+      if (state !== STATE.ATTRACT) return;
+      if (e.target.closest("#bottom-actions, .ctrl-btn")) return;
+      onUserTap();
     },
     true
   );
-  
-  // Дополнительные события для совместимости (только standby).
-  document.addEventListener("mousedown", (e) => {
-    if (state !== STATE.ATTRACT) return;
-    onUserTap();
-  });
-  document.addEventListener("touchstart", (e) => {
-    if (state !== STATE.ATTRACT) return;
-    onUserTap();
-  });
 
   requestAnimationFrame(frame);
 }

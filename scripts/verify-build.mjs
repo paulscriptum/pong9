@@ -9,6 +9,7 @@ const required = [
   "src/standbyWormTrack.js",
   "images/standby_worm.webm",
   "images/standby_worm.mov",
+  "images/standby_worm_opaque.mp4",
   "images/title_8bit_pong.png",
   "images/button_zanovo.png",
   "images/button_rezhim_sna.png",

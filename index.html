@@ -15,14 +15,17 @@
   <div id="app">
     <!-- Фиолетовый standby-экран и видео гусеницы под canvas -->
     <div id="standby-layer">
-      <video id="standby-worm" playsinline muted loop preload="auto">
-        <source src="/images/standby_worm.webm" type="video/webm" />
-        <source src="/images/standby_worm.mov" type="video/quicktime" />
-      </video>
+      <video id="standby-worm" playsinline muted loop preload="auto"></video>
     </div>
 
     <!-- Игровое поле -->
     <canvas id="game"></canvas>
+
+    <!-- Невидимые зоны нажатия для нижних пилюль (надёжнее canvas hit-test на тач-устройствах). -->
+    <div id="bottom-actions" hidden>
+      <button type="button" id="btn-restart" aria-label="Заново"></button>
+      <button type="button" id="btn-sleep" aria-label="Режим сна"></button>
+    </div>
 
     <!--
       Тач-управление (DOM-оверлей поверх canvas).

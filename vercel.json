@@ -6,7 +6,7 @@
   "outputDirectory": ".",
   "headers": [
     {
-      "source": "/(.*)\\.(js|css|woff2|svg|png|jpg|jpeg|webp|webm|mov)",
+      "source": "/(.*)\\.(js|css|woff2|svg|png|jpg|jpeg|webp|webm|mov|mp4)",
       "headers": [
         {
           "key": "Cache-Control",
