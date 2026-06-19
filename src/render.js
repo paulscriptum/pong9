@@ -265,6 +265,14 @@ export class Renderer {
     this.promoPhrase = phrases[this.promoIdx];
   }
 
+  resetPromoPhrase() {
+    const phrases = BRAND.promoPhrases;
+    this.promoIdx = 0;
+    this.promoPhrase = phrases[0] ?? "";
+    this.promoTimer = 0;
+    this.promoAnim = 1;
+  }
+
   updatePromo(dt) {
     this.promoTimer += dt;
     if (this.promoAnim < 1) {

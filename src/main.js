@@ -251,6 +251,7 @@ function onUserTap() {
   Sfx.unlock();
   tryFullscreen();
   if (state === STATE.ATTRACT) {
+    renderer.resetPromoPhrase();
     startMatch();
     return true;
   }
@@ -284,7 +285,9 @@ function drawText(text, x, y, size, color, font = BRAND.fonts.brand, weight = 50
 function update(dt) {
   renderer.updateParticles(dt);
   renderer.updateMascots(dt);
-  renderer.updatePromo(dt);
+  if (state !== STATE.ATTRACT && state !== STATE.GAMEOVER) {
+    renderer.updatePromo(dt);
+  }
 
   switch (state) {
     case STATE.ATTRACT:
