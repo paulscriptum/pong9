@@ -78,7 +78,7 @@ export const BRAND = {
     paddleHeightRatio: 0.256,
     paddleWidthPx: 30,
     paddleMarginRatio: 0.04,
-    paddleInsetRatio: 0.24,
+    paddleInsetRatio: 0.14,
     ballRadiusPx: 18,
     ballStartSpeedRatio: 0.38,
     ballSpeedup: 1.04,
