@@ -74,8 +74,8 @@ export const BRAND = {
   // Игровые параметры.
   game: {
     targetScore: 5,
-    paddleHeightRatio: 0.32,
-    paddleWidthPx: 38,
+    paddleHeightRatio: 0.256,
+    paddleWidthPx: 30,
     paddleMarginRatio: 0.04,
     ballRadiusPx: 18,
     ballStartSpeedRatio: 0.38,

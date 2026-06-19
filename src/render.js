@@ -92,18 +92,27 @@ const LOGO_BIT_TOP = 42 / 297;
 const LOGO_BIT_CAP = 238 / 297;
 const LOGO_BIT_BASELINE = 280 / 297;
 const WIN_BG_SCALE = 1.15;
+const BUBBLE_FONT = '700 %sizepx %family';
+const BUBBLE_FONT_FAMILY = BRAND.fonts.brand;
+
+// Короткие слова, которые нельзя оставлять в конце строки.
+const BUBBLE_ORPHAN_WORDS = new Set([
+  "а", "и", "в", "во", "на", "с", "со", "к", "ко", "по", "за", "из", "изо", "от", "ото", "до",
+  "для", "при", "про", "без", "над", "под", "о", "об", "обо", "у", "не", "ни", "но", "да", "же",
+  "ли", "бы", "что", "как", "то", "та", "те", "уже", "ещё", "еще", "или", "ты", "мы", "он", "она",
+]);
+
 const PROMO_BUBBLE = {
-  textAlignX: -0.32,
   textOffsetY: -0.1,
   lineHeight: 1.16,
   baseHeightRatio: 0.073,
   minScale: 0.42,
   maxScale: 1.65,
-  padRight: 0.22,
+  padX: 0.2,
   padTop: 0.18,
   padBottom: 0.14,
-  rightEdge: 0.34,
   sizeScale: 1.15,
+  fontHeightRatio: 0.0132,
   textPadX: 4,
   textPadY: 3,
 };
@@ -112,17 +121,17 @@ const PROMO_BUBBLE = {
 const STANDBY_BUBBLE = {
   widthScale: 1.311,
   heightScale: 1.55,
-  textScale: 1.3,
   tailFromCenterX: 0.48,
   tailFromCenterY: 0.68,
   headOffsetX: 0.36,
   headOffsetY: 0.28,
   textAlignX: -0.38,
-  textShiftXRatio: -0.78,
+  textShiftXRatio: 0,
   rotateDeg: 30,
   hideLeftRatio: 0.15,
   anchorYTop: 0.11,
   anchorYBottom: 0.87,
+  fontScale: 1.2,
 };
 
 function rotatedBubbleBounds(w, h, rot) {
@@ -268,12 +277,51 @@ export class Renderer {
     }
   }
 
+  _bubbleFontSize() {
+    return Math.max(8, this.h * PROMO_BUBBLE.fontHeightRatio);
+  }
+
+  _setBubbleFont(ctx, size, weight = 700) {
+    ctx.font = `${weight} ${size}px ${BUBBLE_FONT_FAMILY}`;
+  }
+
+  _orphanWord(word) {
+    return BUBBLE_ORPHAN_WORDS.has(
+      String(word)
+        .toLowerCase()
+        .replace(/[^\p{L}\p{N}]/gu, "")
+    );
+  }
+
+  _fixHangingLines(ctx, lines, maxW) {
+    const out = [...lines];
+    let changed = true;
+    while (changed) {
+      changed = false;
+      for (let i = 0; i < out.length - 1; i++) {
+        const words = out[i].split(/\s+/).filter(Boolean);
+        if (words.length < 2) continue;
+        const orphan = words[words.length - 1];
+        if (!this._orphanWord(orphan)) continue;
+        words.pop();
+        const next = `${orphan} ${out[i + 1]}`;
+        const current = words.join(" ");
+        if (current && ctx.measureText(current).width > maxW) continue;
+        if (ctx.measureText(next).width > maxW) continue;
+        out[i] = current;
+        out[i + 1] = next;
+        changed = true;
+      }
+    }
+    return out.filter(Boolean);
+  }
+
   _promoHasHardBreaks(text) {
     return String(text).includes("\n");
   }
 
   _promoHardLines(ctx, text, startSize) {
-    ctx.font = `700 ${startSize}px ${BRAND.fonts.ui}`;
+    this._setBubbleFont(ctx, startSize);
     const lines = String(text)
       .split("\n")
       .map((part) => part.trim())
@@ -303,7 +351,7 @@ export class Renderer {
       }
       lines.push(line);
     }
-    return lines;
+    return this._fixHangingLines(ctx, lines, maxW);
   }
 
   _promoTextInset() {
@@ -316,55 +364,35 @@ export class Renderer {
 
   _fitPromoText(ctx, text, maxW, maxH, startSize) {
     const lineHeight = PROMO_BUBBLE.lineHeight;
-    let size = startSize;
-    const minSize = Math.max(6, startSize * 0.65);
-    while (size >= minSize) {
-      ctx.font = `700 ${size}px ${BRAND.fonts.ui}`;
-      const lines = this._wrapTextLines(ctx, text, maxW);
-      const lineH = size * lineHeight;
-      const blockH = lines.length * lineH;
-      const maxLineW = Math.max(0, ...lines.map((line) => ctx.measureText(line).width));
-      if (blockH <= maxH && maxLineW <= maxW) {
-        return { lines, size, lineH, blockH, maxLineW };
-      }
-      size -= 0.5;
-    }
-    ctx.font = `700 ${minSize}px ${BRAND.fonts.ui}`;
+    this._setBubbleFont(ctx, startSize);
     const lines = this._wrapTextLines(ctx, text, maxW);
-    const lineH = minSize * lineHeight;
-    return {
-      lines,
-      size: minSize,
-      lineH,
-      blockH: lines.length * lineH,
-      maxLineW: Math.max(0, ...lines.map((line) => ctx.measureText(line).width)),
-    };
+    const lineH = startSize * lineHeight;
+    const blockH = lines.length * lineH;
+    const maxLineW = Math.max(0, ...lines.map((line) => ctx.measureText(line).width));
+    return { lines, size: startSize, lineH, blockH, maxLineW };
   }
 
   _promoTextBounds(bubbleW, bubbleH, fit) {
     const inset = this._promoTextInset();
-    const textX = bubbleW * PROMO_BUBBLE.textAlignX + inset.x;
-    const textOy = bubbleH * PROMO_BUBBLE.textOffsetY + inset.y;
-    const padR = fit.size * PROMO_BUBBLE.padRight;
+    const padX = fit.size * PROMO_BUBBLE.padX;
     const padT = fit.size * PROMO_BUBBLE.padTop;
     const padB = fit.size * PROMO_BUBBLE.padBottom;
-    const widthSpan = PROMO_BUBBLE.rightEdge - PROMO_BUBBLE.textAlignX;
-    const maxLineW = Math.max(0, bubbleW * widthSpan - padR - inset.x);
+    const maxLineW = Math.max(0, bubbleW - padX * 2 - inset.x * 2);
     const topNeed = 0.5 + PROMO_BUBBLE.textOffsetY;
     const botNeed = 0.5 - PROMO_BUBBLE.textOffsetY;
     const maxBlockH = Math.max(0, bubbleH * Math.min(topNeed, botNeed) * 2 - padT - padB - inset.y);
-    return { textX, textOy, maxLineW, maxBlockH, topNeed, botNeed };
+    const textOy = bubbleH * PROMO_BUBBLE.textOffsetY + inset.y;
+    return { textOy, maxLineW, maxBlockH };
   }
 
   _promoBubbleSize(fit) {
     const inset = this._promoTextInset();
-    const padR = fit.size * PROMO_BUBBLE.padRight;
+    const padX = fit.size * PROMO_BUBBLE.padX;
     const padT = fit.size * PROMO_BUBBLE.padTop;
     const padB = fit.size * PROMO_BUBBLE.padBottom;
-    const widthSpan = PROMO_BUBBLE.rightEdge - PROMO_BUBBLE.textAlignX;
     const topNeed = 0.5 + PROMO_BUBBLE.textOffsetY;
     const botNeed = 0.5 - PROMO_BUBBLE.textOffsetY;
-    const bubbleW = ((fit.maxLineW + padR + inset.x) / widthSpan) * PROMO_BUBBLE.sizeScale;
+    const bubbleW = (fit.maxLineW + padX * 2 + inset.x * 2) * PROMO_BUBBLE.sizeScale;
     const bubbleH =
       Math.max(
         (fit.blockH / 2 + padT + inset.y) / topNeed,
@@ -377,7 +405,7 @@ export class Renderer {
     if (this._promoHasHardBreaks(text)) {
       return this._promoHardLines(ctx, text, startSize);
     }
-    ctx.font = `700 ${startSize}px ${BRAND.fonts.ui}`;
+    this._setBubbleFont(ctx, startSize);
     const lines = this._wrapTextLines(ctx, text, maxWrapW);
     const lineH = startSize * PROMO_BUBBLE.lineHeight;
     const blockH = lines.length * lineH;
@@ -392,13 +420,12 @@ export class Renderer {
         : 1.79;
     const maxH = this.h * PROMO_BUBBLE.baseHeightRatio * PROMO_BUBBLE.maxScale;
     const maxW = maxH * aspect;
-    const widthSpan = PROMO_BUBBLE.rightEdge - PROMO_BUBBLE.textAlignX;
-    const padR = startSize * PROMO_BUBBLE.padRight;
+    const padX = startSize * PROMO_BUBBLE.padX;
     const inset = this._promoTextInset();
-    return Math.max(0, (maxW * widthSpan - padR - inset.x) / PROMO_BUBBLE.sizeScale);
+    return Math.max(0, (maxW - padX * 2 - inset.x * 2) / PROMO_BUBBLE.sizeScale);
   }
 
-  _layoutPromoBubble(text) {
+  _layoutPromoBubble(text, { fontScale = 1 } = {}) {
     const ctx = this.ctx;
     const aspect =
       speechBubbleImg.complete && speechBubbleImg.naturalWidth > 0
@@ -409,53 +436,35 @@ export class Renderer {
     const maxH = baseH * PROMO_BUBBLE.maxScale;
     const minW = minH * aspect * 0.82;
     const maxW = maxH * aspect;
-    const startSize = Math.max(7, (this.layout.promo?.fontSize ?? this.h * 0.0165) * 0.82);
-    const maxLineWrapW = this._promoMaxLineWrap(startSize);
+    const fontSize = this._bubbleFontSize() * fontScale;
+    const maxLineWrapW = this._promoMaxLineWrap(fontSize);
 
-    const layoutOnce = (size, wrapW) => {
-      const hardBreaks = this._promoHasHardBreaks(text);
-      let fit = this._layoutPromoLines(ctx, text, size, wrapW);
-      let bubbleW;
-      let bubbleH;
-      let bounds;
+    const hardBreaks = this._promoHasHardBreaks(text);
+    let fit = this._layoutPromoLines(ctx, text, fontSize, maxLineWrapW);
+    let bubbleW;
+    let bubbleH;
 
-      if (!hardBreaks) {
-        for (let i = 0; i < 4; i++) {
-          ({ bubbleW, bubbleH } = this._promoBubbleSize(fit));
-          bubbleW = Math.max(minW, Math.min(maxW, bubbleW));
-          bubbleH = Math.max(minH, Math.min(maxH, bubbleH));
-          bounds = this._promoTextBounds(bubbleW, bubbleH, fit);
-          if (fit.blockH <= bounds.maxBlockH && fit.maxLineW <= bounds.maxLineW) break;
-          const refit = this._layoutPromoLines(ctx, text, size, bounds.maxLineW);
-          if (refit.lines.join("|") === fit.lines.join("|")) {
-            fit = refit;
-            break;
-          }
-          fit = refit;
-        }
-      } else {
+    if (!hardBreaks) {
+      for (let i = 0; i < 4; i++) {
         ({ bubbleW, bubbleH } = this._promoBubbleSize(fit));
         bubbleW = Math.max(minW, Math.min(maxW, bubbleW));
         bubbleH = Math.max(minH, Math.min(maxH, bubbleH));
-      }
-
-      bounds = this._promoTextBounds(bubbleW, bubbleH, fit);
-      return { fit, bubbleW, bubbleH, bounds };
-    };
-
-    let { fit, bubbleW, bubbleH, bounds } = layoutOnce(startSize, maxLineWrapW);
-
-    if (fit.blockH > bounds.maxBlockH || fit.maxLineW > bounds.maxLineW) {
-      let size = startSize;
-      const minSize = Math.max(6, startSize * 0.65);
-      while (size >= minSize) {
-        ({ fit, bubbleW, bubbleH, bounds } = layoutOnce(size, this._promoMaxLineWrap(size)));
+        const bounds = this._promoTextBounds(bubbleW, bubbleH, fit);
         if (fit.blockH <= bounds.maxBlockH && fit.maxLineW <= bounds.maxLineW) break;
-        size -= 0.5;
+        const refit = this._layoutPromoLines(ctx, text, fontSize, bounds.maxLineW);
+        if (refit.lines.join("|") === fit.lines.join("|")) {
+          fit = refit;
+          break;
+        }
+        fit = refit;
       }
+    } else {
+      ({ bubbleW, bubbleH } = this._promoBubbleSize(fit));
+      bubbleW = Math.max(minW, Math.min(maxW, bubbleW));
+      bubbleH = Math.max(minH, Math.min(maxH, bubbleH));
     }
 
-    bounds = this._promoTextBounds(bubbleW, bubbleH, fit);
+    const bounds = this._promoTextBounds(bubbleW, bubbleH, fit);
     return { bubbleW, bubbleH, fit, baseH, ...bounds };
   }
 
@@ -793,10 +802,10 @@ export class Renderer {
     layout,
     bubbleCx,
     bubbleCy,
-    { alpha = 1, scale = 1, textShiftX = 0, rotation = 0 } = {}
+    { alpha = 1, scale = 1, rotation = 0, fontWeight = 700 } = {}
   ) {
     const ctx = this.ctx;
-    const { bubbleW, bubbleH, fit, textX, textOy } = layout;
+    const { bubbleW, bubbleH, fit, textOy } = layout;
 
     ctx.save();
     ctx.translate(bubbleCx, bubbleCy);
@@ -810,13 +819,13 @@ export class Renderer {
       this.drawPill(ctx, -bubbleW / 2, -bubbleH / 2, bubbleW, bubbleH);
     }
 
-    ctx.font = `700 ${fit.size}px ${BRAND.fonts.ui}`;
-    ctx.textAlign = "left";
+    this._setBubbleFont(ctx, fit.size, fontWeight);
+    ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillStyle = BRAND.colors.pillText;
     let ty = textOy - fit.blockH / 2 + fit.lineH / 2;
     for (const line of fit.lines) {
-      ctx.fillText(line, textX + textShiftX, ty);
+      ctx.fillText(line, 0, ty);
       ty += fit.lineH;
     }
     ctx.restore();
@@ -824,69 +833,41 @@ export class Renderer {
 
   drawStandbyBubbleCorner(phrase, corner, { alpha = 1, scale = 1 } = {}) {
     const layout = this._layoutPromoBubble(phrase);
-    const ts = STANDBY_BUBBLE.textScale;
-    const fit = {
-      ...layout.fit,
-      size: layout.fit.size * ts,
-      lineH: layout.fit.lineH * ts,
-      blockH: layout.fit.blockH * ts,
-    };
     const bubbleW = layout.bubbleW * STANDBY_BUBBLE.widthScale;
     const bubbleH = layout.bubbleH * STANDBY_BUBBLE.heightScale;
-    // Верхний угол — завал направо; нижний — налево.
     const rotDeg = corner === 0 ? STANDBY_BUBBLE.rotateDeg : -STANDBY_BUBBLE.rotateDeg;
     const rotation = (rotDeg * Math.PI) / 180;
     const bounds = rotatedBubbleBounds(bubbleW, bubbleH, rotation);
     const hiddenLeft = bubbleW * STANDBY_BUBBLE.hideLeftRatio;
-
     const bubbleCx = -hiddenLeft - bounds.minX;
     const bubbleCy =
       corner === 0
         ? this.h * STANDBY_BUBBLE.anchorYTop
         : this.h * STANDBY_BUBBLE.anchorYBottom;
-
     const inset = this._promoTextInset();
-    const textX = bubbleW * STANDBY_BUBBLE.textAlignX + inset.x;
     const textOy = bubbleH * PROMO_BUBBLE.textOffsetY + inset.y;
 
     this._drawPromoBubbleLayout(
-      { ...layout, fit, bubbleW, bubbleH, textX, textOy },
+      { ...layout, bubbleW, bubbleH, textOy },
       bubbleCx,
       bubbleCy,
-      {
-        alpha,
-        scale,
-        rotation,
-        textShiftX: fit.size * STANDBY_BUBBLE.textShiftXRatio,
-      }
+      { alpha, scale, rotation }
     );
   }
 
   drawStandbyBubble(phrase, headX, headY, { alpha = 1, scale = 1 } = {}) {
-    const layout = this._layoutPromoBubble(phrase);
-    const ts = STANDBY_BUBBLE.textScale;
-    const fit = {
-      ...layout.fit,
-      size: layout.fit.size * ts,
-      lineH: layout.fit.lineH * ts,
-      blockH: layout.fit.blockH * ts,
-    };
+    const layout = this._layoutPromoBubble(phrase, { fontScale: STANDBY_BUBBLE.fontScale });
     const bubbleW = layout.bubbleW * STANDBY_BUBBLE.widthScale;
     const bubbleH = layout.bubbleH * STANDBY_BUBBLE.heightScale;
     const inset = this._promoTextInset();
-    const textX = bubbleW * STANDBY_BUBBLE.textAlignX + inset.x;
     const textOy = bubbleH * PROMO_BUBBLE.textOffsetY + inset.y;
     const bubbleCx = headX + bubbleW * STANDBY_BUBBLE.tailFromCenterX;
     const bubbleCy = headY - bubbleH * STANDBY_BUBBLE.tailFromCenterY;
     this._drawPromoBubbleLayout(
-      { ...layout, fit, bubbleW, bubbleH, textX, textOy },
+      { ...layout, bubbleW, bubbleH, textOy },
       bubbleCx,
       bubbleCy,
-      {
-        alpha,
-        scale,
-        textShiftX: fit.size * STANDBY_BUBBLE.textShiftXRatio,
-      }
+      { alpha, scale, fontWeight: 700 }
     );
   }
 
@@ -929,7 +910,7 @@ export class Renderer {
     const ctx = this.ctx;
     const pillH = bottomButtons.h;
     const pillY = bottomButtons.y;
-    const fontSize = bottomButtons.fontSize ?? pillH * 0.62;
+    const fontSize = (bottomButtons.fontSize ?? pillH * 0.62) * 0.84;
 
     ctx.save();
     ctx.textBaseline = "middle";
@@ -953,7 +934,7 @@ export class Renderer {
     ctx.font = `700 ${fontSize}px ${BRAND.fonts.ui}`;
     ctx.textAlign = "center";
     ctx.fillStyle = BRAND.colors.pillText;
-    ctx.fillText("Заново", restartX + restartW * 0.62, pillY + pillH * 0.52);
+    ctx.fillText("ЗАНОВО", restartX + restartW * 0.62, pillY + pillH * 0.52);
 
     // «Режим сна»: пилюля у правого края, «рука со звездой» торчит вверх.
     const sleepW = field.w * 0.249;
@@ -965,7 +946,7 @@ export class Renderer {
       ctx.drawImage(iconSleepHandImg, sleepX - sleepW * 0.18, pillY + pillH - ih, iw, ih);
     }
     ctx.fillStyle = BRAND.colors.pillText;
-    ctx.fillText("Режим сна", sleepX + sleepW * 0.58, pillY + pillH * 0.52);
+    ctx.fillText("РЕЖИМ СНА", sleepX + sleepW * 0.58, pillY + pillH * 0.52);
 
     this.drawCenterPromo(field);
 
